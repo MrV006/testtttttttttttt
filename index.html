@@ -150,6 +150,8 @@ var BK={'':['e2e4','d2d4','c2c4','g1f3'],'e2e4':['e7e5','c7c5','e7e6','c7c6'],'e
 var ON={'e2e4.e7e5.g1f3.b8c6.f1b5':'اسپانیایی','e2e4.e7e5.g1f3.b8c6.f1c4':'ایتالیایی','e2e4.c7c5':'سیسیلی','e2e4.e7e6':'فرانسوی','e2e4.c7c6':'کاروکان','d2d4.d7d5.c2c4':'گامبی وزیر','d2d4.d7d5.c1f4':'لندن','d2d4.g8f6.c2c4.g7g6':'هندی‌شاه'};
 var bd,tn,sel,pms,ov,cas,epq,lmv,cW,cB,df=2,PC='w',fl=false,aOn=false,hs=[],GR=[],mn=0,oNm='',rvI=0;
 var boardSize=300;
+var sfx={move:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3'),capture:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3'),check:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-check.mp3'),end:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-end.mp3'),start:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-start.mp3')};
+function playSound(t){if(sfx[t]){sfx[t].currentTime=0;sfx[t].play().catch(function(){})}}
 
 function mkBd(){return[['r','n','b','q','k','b','n','r'],['p','p','p','p','p','p','p','p'],[E,E,E,E,E,E,E,E],[E,E,E,E,E,E,E,E],[E,E,E,E,E,E,E,E],[E,E,E,E,E,E,E,E],['P','P','P','P','P','P','P','P'],['R','N','B','Q','K','B','N','R']]}
 function cln(b){return[b[0].slice(),b[1].slice(),b[2].slice(),b[3].slice(),b[4].slice(),b[5].slice(),b[6].slice(),b[7].slice()]}
@@ -207,6 +209,7 @@ show('gameS');
 document.getElementById('tn').textContent=fl?'🤖 AI(سفید)':'🤖 AI(سیاه)';
 document.getElementById('bn').textContent=fl?'👤 شما(سیاه)':'👤 شما(سفید)';
 document.getElementById('ap').innerHTML='';document.getElementById('ml').textContent='';
+playSound('start');
 ren();upSt();
 if(PC!=='w')setTimeout(aiTn,300);
 }
@@ -271,9 +274,9 @@ function uCRc(c2,mv){if(mv.fr===7&&mv.fc===4){c2.wk=0;c2.wq=0}if(mv.fr===0&&mv.f
 
 function upSt(){
 var am=aLeg(bd,tn,cas,epq);
-if(!am.length){ov=true;if(iCk(bd,tn))document.getElementById('sts').textContent=tn===PC?'♚ کیش و مات! باختید':'🎉 کیش و مات! بردید!';else document.getElementById('sts').textContent='🤝 پات — مساوی';setTimeout(endAn,400);ren();return}
-if(iCk(bd,tn))document.getElementById('sts').textContent=tn===PC?'⚠️ کیش! شاه را نجات دهید':'⚠️ کیش به حریف!';
-else document.getElementById('sts').textContent=tn===PC?'🎯 نوبت شما':'🤔 ...';
+if(!am.length){ov=true;if(iCk(bd,tn))document.getElementById('sts').textContent=tn===PC?'♚ کیش و مات! باختید':'🎉 کیش و مات! بردید!';else document.getElementById('sts').textContent='🤝 پات — مساوی';playSound('end');setTimeout(endAn,400);ren();return}
+if(iCk(bd,tn)){document.getElementById('sts').textContent=tn===PC?'⚠️ کیش! شاه را نجات دهید':'⚠️ کیش به حریف!';playSound('check');}
+else{document.getElementById('sts').textContent=tn===PC?'🎯 نوبت شما':'🤔 ...';if(lmv)playSound(lmv.cap?'capture':'move');}
 if(oNm)document.getElementById('sts').textContent+=' 📖'+oNm;
 }
 
