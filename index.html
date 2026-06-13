@@ -323,20 +323,144 @@ function fK(b,col){var k=col==='w'?'K':'k';for(var i=0;i<8;i++)for(var j=0;j<8;j
 function iCk(b,col){var kp=fK(b,col);return kp?sAt(b,kp[0],kp[1],col==='w'?'b':'w'):false}
 function leg(b,r,c,col,c2,eps){var mvs=raw(b,r,c,col,eps);if(ty(b[r][c])==='K'){var cm=casM(b,col,c2);for(var i=0;i<cm.length;i++)mvs.push(cm[i])}var out=[];for(var j=0;j<mvs.length;j++){appM(b,mvs[j]);var ok=!iCk(b,col);undMv(b,mvs[j]);if(ok)out.push(mvs[j])}return out}
 function aLeg(b,col,c2,eps){var a=[];for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&co(b[i][j])===col){var m=leg(b,i,j,col,c2,eps);for(var k=0;k<m.length;k++)a.push(m[k])}return a}
-function isEG(b){var q=0;for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&ty(b[i][j])==='Q')q++;return q===0}
-function ev(b){var s=0,eg=isEG(b),wB=0,bB=0,wP=[0,0,0,0,0,0,0,0],bP=[0,0,0,0,0,0,0,0],wK=[-1,-1],bK=[-1,-1];for(var i=0;i<8;i++)for(var j=0;j<8;j++){var p=b[i][j];if(!p)continue;var t2=ty(p),c=co(p),v=PV[t2]||0,tb=(t2==='K'&&eg)?TBL.KE:TBL[t2],ps=tb?(c==='w'?tb[i][j]:tb[7-i][j]):0;s+=(c==='w'?1:-1)*(v+ps);if(t2==='B'){if(c==='w')wB++;else bB++}else if(t2==='P'){if(c==='w')wP[j]++;else bP[j]++}else if(t2==='K'){if(c==='w')wK=[i,j];else bK=[i,j]}}if(wB>=2)s+=30;if(bB>=2)s-=30;for(var f=0;f<8;f++){if(wP[f]>1)s-=(wP[f]-1)*15;if(bP[f]>1)s+=(bP[f]-1)*15;var wL=f>0?wP[f-1]:0,wR=f<7?wP[f+1]:0;if(wP[f]>0&&wL===0&&wR===0)s-=20;var bL=f>0?bP[f-1]:0,bR=f<7?bP[f+1]:0;if(bP[f]>0&&bL===0&&bR===0)s+=20}for(var i=0;i<8;i++)for(var j=0;j<8;j++){var p=b[i][j];if(!p)continue;var t2=ty(p),c=co(p);if(t2==='P'){var ip=true;if(c==='w'){for(var nf=Math.max(0,j-1);nf<=Math.min(7,j+1);nf++){for(var nr=0;nr<i;nr++)if(b[nr][nf]==='p'){ip=false;break}if(!ip)break}if(ip)s+=(7-i)*10}else{for(var nf=Math.max(0,j-1);nf<=Math.min(7,j+1);nf++){for(var nr=i+1;nr<8;nr++)if(b[nr][nf]==='P'){ip=false;break}if(!ip)break}if(ip)s-=i*10}}}if(!eg){if(wK[0]!==-1){var kc=wK[1];for(var f=Math.max(0,kc-1);f<=Math.min(7,kc+1);f++)if(wP[f]===0)s-=25}if(bK[0]!==-1){var kc=bK[1];for(var f=Math.max(0,kc-1);f<=Math.min(7,kc+1);f++)if(bP[f]===0)s+=25}}return s}
-function ord(b,mvs){
+function ev(b){
+  var s=0;
+  var wB=0, bB=0;
+  var wP=[0,0,0,0,0,0,0,0], bP=[0,0,0,0,0,0,0,0];
+  var wK=[-1,-1], bK=[-1,-1];
+  
+  var phaseWeight = { 'N': 1, 'B': 1, 'R': 2, 'Q': 4 };
+  var totalPhase = 0;
+  
+  for (var i=0; i<8; i++){
+    for (var j=0; j<8; j++){
+      var p=b[i][j];
+      if(!p) continue;
+      var t2=ty(p);
+      if(phaseWeight[t2] !== undefined){
+        totalPhase += phaseWeight[t2];
+      }
+    }
+  }
+  var phase = Math.min(24, totalPhase);
+  
+  for (var i=0; i<8; i++){
+    for (var j=0; j<8; j++){
+      var p=b[i][j];
+      if(!p) continue;
+      var t2=ty(p), c=co(p), v=PV[t2]||0;
+      
+      var ps = 0;
+      if (t2 === 'K') {
+        var mgK = TBL.K[i][j];
+        var egK = TBL.KE[i][j];
+        var tblK = c==='w' ? (mgK * phase + egK * (24 - phase)) / 24 : (TBL.K[7-i][j] * phase + TBL.KE[7-i][j] * (24 - phase)) / 24;
+        ps = Math.round(tblK);
+      } else {
+        var tb=TBL[t2];
+        ps = tb ? (c==='w' ? tb[i][j] : tb[7-i][j]) : 0;
+      }
+      
+      s += (c==='w'?1:-1)*(v+ps);
+      
+      if(t2==='B'){
+        if(c==='w') wB++; else bB++;
+      } else if(t2==='P'){
+        if(c==='w') wP[j]++; else bP[j]++;
+      } else if(t2==='K'){
+        if(c==='w') wK=[i,j]; else bK=[i,j];
+      }
+    }
+  }
+  
+  if(wB>=2) s+=30;
+  if(bB>=2) s-=30;
+  
+  for (var f=0; f<8; f++){
+    if(wP[f]>1) s-=(wP[f]-1)*15;
+    if(bP[f]>1) s+=(bP[f]-1)*15;
+    var wL=f>0?wP[f-1]:0, wR=f<7?wP[f+1]:0;
+    if(wP[f]>0&&wL===0&&wR===0) s-=20;
+    var bL=f>0?bP[f-1]:0, bR=f<7?bP[f+1]:0;
+    if(bP[f]>0&&bL===0&&bR===0) s+=20;
+  }
+  
+  for (var i=0; i<8; i++){
+    for (var j=0; j<8; j++){
+      var p=b[i][j];
+      if(!p) continue;
+      var t2=ty(p), c=co(p);
+      if(t2==='P'){
+        var ip=true;
+        if(c==='w'){
+          for(var nf=Math.max(0,j-1); nf<=Math.min(7,j+1); nf++){
+            for(var nr=0; nr<i; nr++) {
+              if(b[nr][nf]==='p'){ ip=false; break; }
+            }
+            if(!ip) break;
+          }
+          if(ip) s+=(7-i)*10;
+        } else {
+          for(var nf=Math.max(0,j-1); nf<=Math.min(7,j+1); nf++){
+            for(var nr=i+1; nr<8; nr++) {
+              if(b[nr][nf]==='P'){ ip=false; break; }
+            }
+            if(!ip) break;
+          }
+          if(ip) s-=i*10;
+        }
+      }
+    }
+  }
+  
+  var wShieldPenalty = 0;
+  var bShieldPenalty = 0;
+  if(wK[0]!==-1){
+    var kc=wK[1];
+    for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
+      if(wP[f]===0) wShieldPenalty += 25;
+    }
+  }
+  if(bK[0]!==-1){
+    var kc=bK[1];
+    for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
+      if(bP[f]===0) bShieldPenalty += 25;
+    }
+  }
+  s -= Math.round((wShieldPenalty * phase) / 24);
+  s += Math.round((bShieldPenalty * phase) / 24);
+  
+  return s;
+}
+var killerMoves = {};
+var historyTable = new Int32Array(4096);
+
+function ord(b,mvs,d){
   mvs.sort(function(a,z){
     var sa=0,sz=0;
     if(a.cap) {
       var victimVal = PV[ty(a.cap)]||0;
       var attackerVal = PV[ty(b[a.fr][a.fc])]||100;
-      sa += victimVal * 100 - attackerVal;
+      sa += 100000 + victimVal * 100 - attackerVal;
+    } else {
+      var fromA = a.fr * 8 + a.fc, toA = a.tr * 8 + a.tc;
+      sa += historyTable[fromA * 64 + toA] || 0;
+      if (d && killerMoves[d]) {
+        if (killerMoves[d][0] && killerMoves[d][0].fr===a.fr && killerMoves[d][0].fc===a.fc && killerMoves[d][0].tr===a.tr && killerMoves[d][0].tc===a.tc) sa += 50000;
+        else if (killerMoves[d][1] && killerMoves[d][1].fr===a.fr && killerMoves[d][1].fc===a.fc && killerMoves[d][1].tr===a.tr && killerMoves[d][1].tc===a.tc) sa += 40000;
+      }
     }
     if(z.cap) {
       var victimVal = PV[ty(z.cap)]||0;
       var attackerVal = PV[ty(b[z.fr][z.fc])]||100;
-      sz += victimVal * 100 - attackerVal;
+      sz += 100000 + victimVal * 100 - attackerVal;
+    } else {
+      var fromZ = z.fr * 8 + z.fc, toZ = z.tr * 8 + z.tc;
+      sz += historyTable[fromZ * 64 + toZ] || 0;
+      if (d && killerMoves[d]) {
+        if (killerMoves[d][0] && killerMoves[d][0].fr===z.fr && killerMoves[d][0].fc===z.fc && killerMoves[d][0].tr===z.tr && killerMoves[d][0].tc===z.tc) sz += 50000;
+        else if (killerMoves[d][1] && killerMoves[d][1].fr===z.fr && killerMoves[d][1].fc===z.fc && killerMoves[d][1].tr===z.tr && killerMoves[d][1].tc===z.tc) sz += 40000;
+      }
     }
     if(a.pro||a.pp) sa += 9000;
     if(z.pro||z.pp) sz += 9000;
@@ -393,7 +517,7 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
   var col=mx?'w':'b',mvs=aLeg(b,col,c2,eps);
   if(!mvs.length){if(iCk(b,col))return{s:mx?-99999+d*100:99999-d*100};return{s:0}}
   for(var i=0;i<mvs.length;i++){if(mvs[i].pro)mvs[i]={fr:mvs[i].fr,fc:mvs[i].fc,tr:mvs[i].tr,tc:mvs[i].tc,cap:mvs[i].cap,pro:false,pp:col==='w'?'Q':'q',cas:mvs[i].cas,epc:mvs[i].epc,epp:mvs[i].epp}}
-  ord(b,mvs);
+  ord(b,mvs,d);
   if(TT[h]&&TT[h].move){
     var hm=TT[h].move;
     for(var i=0;i<mvs.length;i++){
@@ -414,12 +538,44 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
       appM(b,mvs[i]);
       var nc={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc,mvs[i]);
-      var r=mmx(b,d-1,al,bt,false,nc,mvs[i].epc||E);
+      var r;
+      if(i===0){
+        r=mmx(b,d-1,al,bt,false,nc,mvs[i].epc||E);
+      }else{
+        if(d>=3 && i>=3 && !mvs[i].cap && !iCk(b,'w') && !iCk(b,'b')){
+          r=mmx(b,d-2,al,al+1,false,nc,mvs[i].epc||E);
+          if(r.s>al){
+            r=mmx(b,d-1,al,al+1,false,nc,mvs[i].epc||E);
+          }
+        }else{
+          r=mmx(b,d-1,al,al+1,false,nc,mvs[i].epc||E);
+        }
+        if(r.s>al && r.s<bt){
+          r=mmx(b,d-1,al,bt,false,nc,mvs[i].epc||E);
+        }
+      }
       undMv(b,mvs[i]);
       if(globalAborted) break;
       if(r.s>mE){mE=r.s;best=mvs[i]}
       al=Math.max(al,r.s);
-      if(bt<=al)break;
+      if(bt<=al){
+        if(!mvs[i].cap){
+          if(!killerMoves[d]) killerMoves[d]=[];
+          var exists=false;
+          for(var k=0;k<killerMoves[d].length;k++){
+            var km=killerMoves[d][k];
+            if(km.fr===mvs[i].fr && km.fc===mvs[i].fc && km.tr===mvs[i].tr && km.tc===mvs[i].tc){exists=true;break;}
+          }
+          if(!exists){
+            killerMoves[d].unshift(mvs[i]);
+            if(killerMoves[d].length>2)killerMoves[d].pop();
+          }
+          var fromSq=mvs[i].fr*8+mvs[i].fc;
+          var toSq=mvs[i].tr*8+mvs[i].tc;
+          historyTable[fromSq*64+toSq]+=d*d;
+        }
+        break;
+      }
     }
     var res={s:mE,move:best};
     if(!globalAborted) {
@@ -436,12 +592,44 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
       appM(b,mvs[i]);
       var nc2={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc2,mvs[i]);
-      var r2=mmx(b,d-1,al,bt,true,nc2,mvs[i].epc||E);
+      var r2;
+      if(i===0){
+        r2=mmx(b,d-1,al,bt,true,nc2,mvs[i].epc||E);
+      }else{
+        if(d>=3 && i>=3 && !mvs[i].cap && !iCk(b,'b') && !iCk(b,'w')){
+          r2=mmx(b,d-2,bt-1,bt,true,nc2,mvs[i].epc||E);
+          if(r2.s<bt){
+            r2=mmx(b,d-1,bt-1,bt,true,nc2,mvs[i].epc||E);
+          }
+        }else{
+          r2=mmx(b,d-1,bt-1,bt,true,nc2,mvs[i].epc||E);
+        }
+        if(r2.s<bt && r2.s>al){
+          r2=mmx(b,d-1,al,bt,true,nc2,mvs[i].epc||E);
+        }
+      }
       undMv(b,mvs[i]);
       if(globalAborted) break;
       if(r2.s<mE2){mE2=r2.s;best=mvs[i]}
       bt=Math.min(bt,r2.s);
-      if(bt<=al)break;
+      if(bt<=al){
+        if(!mvs[i].cap){
+          if(!killerMoves[d]) killerMoves[d]=[];
+          var exists=false;
+          for(var k=0;k<killerMoves[d].length;k++){
+            var km=killerMoves[d][k];
+            if(km.fr===mvs[i].fr && km.fc===mvs[i].fc && km.tr===mvs[i].tr && km.tc===mvs[i].tc){exists=true;break;}
+          }
+          if(!exists){
+            killerMoves[d].unshift(mvs[i]);
+            if(killerMoves[d].length>2)killerMoves[d].pop();
+          }
+          var fromSq=mvs[i].fr*8+mvs[i].fc;
+          var toSq=mvs[i].tr*8+mvs[i].tc;
+          historyTable[fromSq*64+toSq]+=d*d;
+        }
+        break;
+      }
     }
     var res2={s:mE2,move:best};
     if(!globalAborted) {
@@ -455,6 +643,8 @@ self.onmessage=function(e){
   var d=e.data;
   if(d.type==='minimax'){
     TT={};
+    killerMoves={};
+    for(var i=0;i<4096;i++)historyTable[i]=0;
     globalStartTime = Date.now();
     globalTimeLimit = d.timeLimit || 2500;
     globalAborted = false;
@@ -464,7 +654,26 @@ self.onmessage=function(e){
     var bestResult = null;
     
     for(var currentDepth = 1; currentDepth <= maxDepth; currentDepth++){
-      var res = mmx(d.bd, currentDepth, d.al, d.bt, d.mx, d.c2, d.eps);
+      var res;
+      var delta = 35; // Fine centipawn margin for narrowing first-step search
+      
+      if (currentDepth >= 3 && bestResult !== null && Math.abs(bestResult.s) < 15000) {
+        var alphaBound = bestResult.s - delta;
+        var betaBound = bestResult.s + delta;
+        
+        res = mmx(d.bd, currentDepth, alphaBound, betaBound, d.mx, d.c2, d.eps);
+        
+        if (!globalAborted && res.s <= alphaBound) {
+          // Failed low: search with expanded bounds
+          res = mmx(d.bd, currentDepth, d.al, betaBound, d.mx, d.c2, d.eps);
+        } else if (!globalAborted && res.s >= betaBound) {
+          // Failed high: search with expanded bounds
+          res = mmx(d.bd, currentDepth, alphaBound, d.bt, d.mx, d.c2, d.eps);
+        }
+      } else {
+        res = mmx(d.bd, currentDepth, d.al, d.bt, d.mx, d.c2, d.eps);
+      }
+      
       if(globalAborted){
         break;
       }
@@ -648,8 +857,115 @@ function iCk(b,col){var kp=fK(b,col);return kp?sAt(b,kp[0],kp[1],col==='w'?'b':'
 function leg(b,r,c,col,c2,eps){var mvs=raw(b,r,c,col,eps);if(ty(b[r][c])==='K'){var cm=casM(b,col,c2);for(var i=0;i<cm.length;i++)mvs.push(cm[i])}var out=[];for(var j=0;j<mvs.length;j++){appM(b,mvs[j]);var ok=!iCk(b,col);undMv(b,mvs[j]);if(ok)out.push(mvs[j])}return out}
 function aLeg(b,col,c2,eps){var a=[];for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&co(b[i][j])===col){var m=leg(b,i,j,col,c2,eps);for(var k=0;k<m.length;k++)a.push(m[k])}return a}
 
-function isEG(b){var q=0;for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&ty(b[i][j])==='Q')q++;return q===0}
-function ev(b){var s=0,eg=isEG(b),wB=0,bB=0,wP=[0,0,0,0,0,0,0,0],bP=[0,0,0,0,0,0,0,0],wK=[-1,-1],bK=[-1,-1];for(var i=0;i<8;i++)for(var j=0;j<8;j++){var p=b[i][j];if(!p)continue;var t2=ty(p),c=co(p),v=PV[t2]||0,tb=(t2==='K'&&eg)?TBL.KE:TBL[t2],ps=tb?(c==='w'?tb[i][j]:tb[7-i][j]):0;s+=(c==='w'?1:-1)*(v+ps);if(t2==='B'){if(c==='w')wB++;else bB++}else if(t2==='P'){if(c==='w')wP[j]++;else bP[j]++}else if(t2==='K'){if(c==='w')wK=[i,j];else bK=[i,j]}}if(wB>=2)s+=30;if(bB>=2)s-=30;for(var f=0;f<8;f++){if(wP[f]>1)s-=(wP[f]-1)*15;if(bP[f]>1)s+=(bP[f]-1)*15;var wL=f>0?wP[f-1]:0,wR=f<7?wP[f+1]:0;if(wP[f]>0&&wL===0&&wR===0)s-=20;var bL=f>0?bP[f-1]:0,bR=f<7?bP[f+1]:0;if(bP[f]>0&&bL===0&&bR===0)s+=20}for(var i=0;i<8;i++)for(var j=0;j<8;j++){var p=b[i][j];if(!p)continue;var t2=ty(p),c=co(p);if(t2==='P'){var ip=true;if(c==='w'){for(var nf=Math.max(0,j-1);nf<=Math.min(7,j+1);nf++){for(var nr=0;nr<i;nr++)if(b[nr][nf]==='p'){ip=false;break}if(!ip)break}if(ip)s+=(7-i)*10}else{for(var nf=Math.max(0,j-1);nf<=Math.min(7,j+1);nf++){for(var nr=i+1;nr<8;nr++)if(b[nr][nf]==='P'){ip=false;break}if(!ip)break}if(ip)s-=i*10}}}if(!eg){if(wK[0]!==-1){var kc=wK[1];for(var f=Math.max(0,kc-1);f<=Math.min(7,kc+1);f++)if(wP[f]===0)s-=25}if(bK[0]!==-1){var kc=bK[1];for(var f=Math.max(0,kc-1);f<=Math.min(7,kc+1);f++)if(bP[f]===0)s+=25}}return s}
+function ev(b){
+  var s=0;
+  var wB=0, bB=0;
+  var wP=[0,0,0,0,0,0,0,0], bP=[0,0,0,0,0,0,0,0];
+  var wK=[-1,-1], bK=[-1,-1];
+  
+  var phaseWeight = { 'N': 1, 'B': 1, 'R': 2, 'Q': 4 };
+  var totalPhase = 0;
+  
+  for (var i=0; i<8; i++){
+    for (var j=0; j<8; j++){
+      var p=b[i][j];
+      if(!p) continue;
+      var t2=ty(p);
+      if(phaseWeight[t2] !== undefined){
+        totalPhase += phaseWeight[t2];
+      }
+    }
+  }
+  var phase = Math.min(24, totalPhase);
+  
+  for (var i=0; i<8; i++){
+    for (var j=0; j<8; j++){
+      var p=b[i][j];
+      if(!p) continue;
+      var t2=ty(p), c=co(p), v=PV[t2]||0;
+      
+      var ps = 0;
+      if (t2 === 'K') {
+        var mgK = TBL.K[i][j];
+        var egK = TBL.KE[i][j];
+        var tblK = c==='w' ? (mgK * phase + egK * (24 - phase)) / 24 : (TBL.K[7-i][j] * phase + TBL.KE[7-i][j] * (24 - phase)) / 24;
+        ps = Math.round(tblK);
+      } else {
+        var tb=TBL[t2];
+        ps = tb ? (c==='w' ? tb[i][j] : tb[7-i][j]) : 0;
+      }
+      
+      s += (c==='w'?1:-1)*(v+ps);
+      
+      if(t2==='B'){
+        if(c==='w') wB++; else bB++;
+      } else if(t2==='P'){
+        if(c==='w') wP[j]++; else bP[j]++;
+      } else if(t2==='K'){
+        if(c==='w') wK=[i,j]; else bK=[i,j];
+      }
+    }
+  }
+  
+  if(wB>=2) s+=30;
+  if(bB>=2) s-=30;
+  
+  for (var f=0; f<8; f++){
+    if(wP[f]>1) s-=(wP[f]-1)*15;
+    if(bP[f]>1) s+=(bP[f]-1)*15;
+    var wL=f>0?wP[f-1]:0, wR=f<7?wP[f+1]:0;
+    if(wP[f]>0&&wL===0&&wR===0) s-=20;
+    var bL=f>0?bP[f-1]:0, bR=f<7?bP[f+1]:0;
+    if(bP[f]>0&&bL===0&&bR===0) s+=20;
+  }
+  
+  for (var i=0; i<8; i++){
+    for (var j=0; j<8; j++){
+      var p=b[i][j];
+      if(!p) continue;
+      var t2=ty(p), c=co(p);
+      if(t2==='P'){
+        var ip=true;
+        if(c==='w'){
+          for(var nf=Math.max(0,j-1); nf<=Math.min(7,j+1); nf++){
+            for(var nr=0; nr<i; nr++) {
+              if(b[nr][nf]==='p'){ ip=false; break; }
+            }
+            if(!ip) break;
+          }
+          if(ip) s+=(7-i)*10;
+        } else {
+          for(var nf=Math.max(0,j-1); nf<=Math.min(7,j+1); nf++){
+            for(var nr=i+1; nr<8; nr++) {
+              if(b[nr][nf]==='P'){ ip=false; break; }
+            }
+            if(!ip) break;
+          }
+          if(ip) s-=i*10;
+        }
+      }
+    }
+  }
+  
+  var wShieldPenalty = 0;
+  var bShieldPenalty = 0;
+  if(wK[0]!==-1){
+    var kc=wK[1];
+    for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
+      if(wP[f]===0) wShieldPenalty += 25;
+    }
+  }
+  if(bK[0]!==-1){
+    var kc=bK[1];
+    for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
+      if(bP[f]===0) bShieldPenalty += 25;
+    }
+  }
+  s -= Math.round((wShieldPenalty * phase) / 24);
+  s += Math.round((bShieldPenalty * phase) / 24);
+  
+  return s;
+}
 var MT_TT={};
 function getHashMT(b,mx,c2,eps){
   var s=mx?'w':'b';
@@ -658,18 +974,35 @@ function getHashMT(b,mx,c2,eps){
   for(var i=0;i<8;i++)for(var j=0;j<8;j++)s+=b[i][j]||'.';
   return s;
 }
-function ord(b,mvs){
+var MT_killerMoves = {};
+var MT_historyTable = new Int32Array(4096);
+
+function ordMT(b,mvs,d){
   mvs.sort(function(a,z){
     var sa=0,sz=0;
     if(a.cap) {
       var victimVal = PV[ty(a.cap)]||0;
       var attackerVal = PV[ty(b[a.fr][a.fc])]||100;
-      sa += victimVal * 100 - attackerVal;
+      sa += 100000 + victimVal * 100 - attackerVal;
+    } else {
+      var fromA = a.fr * 8 + a.fc, toA = a.tr * 8 + a.tc;
+      sa += MT_historyTable[fromA * 64 + toA] || 0;
+      if (d && MT_killerMoves[d]) {
+        if (MT_killerMoves[d][0] && MT_killerMoves[d][0].fr===a.fr && MT_killerMoves[d][0].fc===a.fc && MT_killerMoves[d][0].tr===a.tr && MT_killerMoves[d][0].tc===a.tc) sa += 50000;
+        else if (MT_killerMoves[d][1] && MT_killerMoves[d][1].fr===a.fr && MT_killerMoves[d][1].fc===a.fc && MT_killerMoves[d][1].tr===a.tr && MT_killerMoves[d][1].tc===a.tc) sa += 40000;
+      }
     }
     if(z.cap) {
       var victimVal = PV[ty(z.cap)]||0;
       var attackerVal = PV[ty(b[z.fr][z.fc])]||100;
-      sz += victimVal * 100 - attackerVal;
+      sz += 100000 + victimVal * 100 - attackerVal;
+    } else {
+      var fromZ = z.fr * 8 + z.fc, toZ = z.tr * 8 + z.tc;
+      sz += MT_historyTable[fromZ * 64 + toZ] || 0;
+      if (d && MT_killerMoves[d]) {
+        if (MT_killerMoves[d][0] && MT_killerMoves[d][0].fr===z.fr && MT_killerMoves[d][0].fc===z.fc && MT_killerMoves[d][0].tr===z.tr && MT_killerMoves[d][0].tc===z.tc) sz += 50000;
+        else if (MT_killerMoves[d][1] && MT_killerMoves[d][1].fr===z.fr && MT_killerMoves[d][1].fc===z.fc && MT_killerMoves[d][1].tr===z.tr && MT_killerMoves[d][1].tc===z.tc) sz += 40000;
+      }
     }
     if(a.pro||a.pp) sa += 9000;
     if(z.pro||z.pp) sz += 9000;
@@ -684,7 +1017,7 @@ if(mx){
 if(val>=bt)return val;
 if(val>al)al=val;
 var mvs=aLeg(b,'w',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
-ord(b,mvs);
+ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
 appM(b,mvs[i]);var s=qsh(b,al,bt,false);undMv(b,mvs[i]);
 if(s>=bt)return bt;
@@ -695,7 +1028,7 @@ return al;
 if(val<=al)return val;
 if(val<bt)bt=val;
 var mvs=aLeg(b,'b',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
-ord(b,mvs);
+ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
 appM(b,mvs[i]);var s=qsh(b,al,bt,true);undMv(b,mvs[i]);
 if(s<=al)return al;
@@ -713,7 +1046,7 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
   var col=mx?'w':'b',mvs=aLeg(b,col,c2,eps);
   if(!mvs.length){if(iCk(b,col))return{s:mx?-99999+d*100:99999-d*100};return{s:0}}
   for(var i=0;i<mvs.length;i++){if(mvs[i].pro)mvs[i]={fr:mvs[i].fr,fc:mvs[i].fc,tr:mvs[i].tr,tc:mvs[i].tc,cap:mvs[i].cap,pro:false,pp:col==='w'?'Q':'q',cas:mvs[i].cas,epc:mvs[i].epc,epp:mvs[i].epp}}
-  ord(b,mvs);
+  ordMT(b,mvs,d);
   if(MT_TT[h]&&MT_TT[h].move){
     var hm=MT_TT[h].move;
     for(var i=0;i<mvs.length;i++){
@@ -734,11 +1067,44 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
       appM(b,mvs[i]);
       var nc={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc,mvs[i]);
-      var r=mmx(b,d-1,al,bt,false,nc,mvs[i].epc||E);
+      var r;
+      if(i===0){
+        r=mmx(b,d-1,al,bt,false,nc,mvs[i].epc||E);
+      }else{
+        if(d>=3 && i>=3 && !mvs[i].cap && !iCk(b,'w') && !iCk(b,'b')){
+          r=mmx(b,d-2,al,al+1,false,nc,mvs[i].epc||E);
+          if(r.s>al){
+            r=mmx(b,d-1,al,al+1,false,nc,mvs[i].epc||E);
+          }
+        }else{
+          r=mmx(b,d-1,al,al+1,false,nc,mvs[i].epc||E);
+        }
+        if(r.s>al && r.s<bt){
+          r=mmx(b,d-1,al,bt,false,nc,mvs[i].epc||E);
+        }
+      }
       undMv(b,mvs[i]);
       if(r.s>mE){mE=r.s;best=mvs[i]}
       al=Math.max(al,r.s);
-      if(bt<=al)break}
+      if(bt<=al){
+        if(!mvs[i].cap){
+          if(!MT_killerMoves[d]) MT_killerMoves[d]=[];
+          var exists=false;
+          for(var k=0;k<MT_killerMoves[d].length;k++){
+            var km=MT_killerMoves[d][k];
+            if(km.fr===mvs[i].fr && km.fc===mvs[i].fc && km.tr===mvs[i].tr && km.tc===mvs[i].tc){exists=true;break;}
+          }
+          if(!exists){
+            MT_killerMoves[d].unshift(mvs[i]);
+            if(MT_killerMoves[d].length>2)MT_killerMoves[d].pop();
+          }
+          var fromSq=mvs[i].fr*8+mvs[i].fc;
+          var toSq=mvs[i].tr*8+mvs[i].tc;
+          MT_historyTable[fromSq*64+toSq]+=d*d;
+        }
+        break;
+      }
+    }
     var res={s:mE,move:best};
     MT_TT[h]={depth:d,val:res,move:best};
     return res;
@@ -752,18 +1118,51 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
       appM(b,mvs[i]);
       var nc2={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc2,mvs[i]);
-      var r2=mmx(b,d-1,al,bt,true,nc2,mvs[i].epc||E);
+      var r2;
+      if(i===0){
+        r2=mmx(b,d-1,al,bt,true,nc2,mvs[i].epc||E);
+      }else{
+        if(d>=3 && i>=3 && !mvs[i].cap && !iCk(b,'b') && !iCk(b,'w')){
+          r2=mmx(b,d-2,bt-1,bt,true,nc2,mvs[i].epc||E);
+          if(r2.s<bt){
+            r2=mmx(b,d-1,bt-1,bt,true,nc2,mvs[i].epc||E);
+          }
+        }else{
+          r2=mmx(b,d-1,bt-1,bt,true,nc2,mvs[i].epc||E);
+        }
+        if(r2.s<bt && r2.s>al){
+          r2=mmx(b,d-1,al,bt,true,nc2,mvs[i].epc||E);
+        }
+      }
       undMv(b,mvs[i]);
       if(r2.s<mE2){mE2=r2.s;best=mvs[i]}
       bt=Math.min(bt,r2.s);
-      if(bt<=al)break}
+      if(bt<=al){
+        if(!mvs[i].cap){
+          if(!MT_killerMoves[d]) MT_killerMoves[d]=[];
+          var exists=false;
+          for(var k=0;k<MT_killerMoves[d].length;k++){
+            var km=MT_killerMoves[d][k];
+            if(km.fr===mvs[i].fr && km.fc===mvs[i].fc && km.tr===mvs[i].tr && km.tc===mvs[i].tc){exists=true;break;}
+          }
+          if(!exists){
+            MT_killerMoves[d].unshift(mvs[i]);
+            if(MT_killerMoves[d].length>2)MT_killerMoves[d].pop();
+          }
+          var fromSq=mvs[i].fr*8+mvs[i].fc;
+          var toSq=mvs[i].tr*8+mvs[i].tc;
+          MT_historyTable[fromSq*64+toSq]+=d*d;
+        }
+        break;
+      }
+    }
     var res2={s:mE2,move:best};
     MT_TT[h]={depth:d,val:res2,move:best};
     return res2;
   }
 }
 
-function anaP(bB,crB,epB,mv){try{var mx=PC==='w',d=3;MT_TT={};var bst=mmx(cln(bB),d,-1e9,1e9,mx,{wk:crB.wk,wq:crB.wq,bk:crB.bk,bq:crB.bq},epB);var bS=bst.s;var tb=cln(bB);var tm={fr:mv.fr,fc:mv.fc,tr:mv.tr,tc:mv.tc,cap:mv.cap,cas:mv.cas,epc:mv.epc,epp:mv.epp,pp:mv.pp};appM(tb,tm);var nc={wk:crB.wk,wq:crB.wq,bk:crB.bk,bq:crB.bq};uCRc(nc,tm);var aft=mmx(cln(tb),Math.max(1,d-1),-1e9,1e9,!mx,nc,tm.epc||E);var pS=aft.s;var dd=Math.max(0,mx?(bS-pS):(pS-bS));var ac=Math.max(0,Math.min(100,Math.round(100-dd*0.25)));var pc=bB[mv.fr][mv.fc],pN=PF[ty(pc)]||'',ds=s2a(mv.tr,mv.tc);var rs=[],txt='';if(ac>=95){txt='✨عالی!';rs.push('بهترین حرکت')}else if(ac>=80){txt='👍خوب!';rs.push('حرکت قوی')}else if(ac>=60){txt='👌قابل قبول';rs.push('بد نیست')}else if(ac>=40){txt='⚠️ضعیف';rs.push('حرکت ضعیف')}else{txt='❌اشتباه!';rs.push('اشتباه جدی')}if(mv.cap)rs.push('گرفتن '+PF[ty(mv.cap)]);if(mv.cas)rs.push('قلعه');if(ac<80&&bst.move){var bp=bB[bst.move.fr][bst.move.fc];if(bp)rs.push('بهتر: '+PF[ty(bp)]+'→'+s2a(bst.move.tr,bst.move.tc))}txt+=' '+pN+'→'+ds+' ('+ac+'%) — '+rs.join('، ');return{t:txt,a:ac}}catch(e){return{t:'تحلیل ناموفق',a:50}}}
+function anaP(bB,crB,epB,mv){try{var mx=PC==='w',d=3;MT_TT={};MT_killerMoves={};for(var i=0;i<4096;i++)MT_historyTable[i]=0;var bst=mmx(cln(bB),d,-1e9,1e9,mx,{wk:crB.wk,wq:crB.wq,bk:crB.bk,bq:crB.bq},epB);var bS=bst.s;var tb=cln(bB);var tm={fr:mv.fr,fc:mv.fc,tr:mv.tr,tc:mv.tc,cap:mv.cap,cas:mv.cas,epc:mv.epc,epp:mv.epp,pp:mv.pp};appM(tb,tm);var nc={wk:crB.wk,wq:crB.wq,bk:crB.bk,bq:crB.bq};uCRc(nc,tm);var aft=mmx(cln(tb),Math.max(1,d-1),-1e9,1e9,!mx,nc,tm.epc||E);var pS=aft.s;var dd=Math.max(0,mx?(bS-pS):(pS-bS));var ac=Math.max(0,Math.min(100,Math.round(100-dd*0.25)));var pc=bB[mv.fr][mv.fc],pN=PF[ty(pc)]||'',ds=s2a(mv.tr,mv.tc);var rs=[],txt='';if(ac>=95){txt='✨عالی!';rs.push('بهترین حرکت')}else if(ac>=80){txt='👍خوب!';rs.push('حرکت قوی')}else if(ac>=60){txt='👌قابل قبول';rs.push('بد نیست')}else if(ac>=40){txt='⚠️ضعیف';rs.push('حرکت ضعیف')}else{txt='❌اشتباه!';rs.push('اشتباه جدی')}if(mv.cap)rs.push('گرفتن '+PF[ty(mv.cap)]);if(mv.cas)rs.push('قلعه');if(ac<80&&bst.move){var bp=bB[bst.move.fr][bst.move.fc];if(bp)rs.push('بهتر: '+PF[ty(bp)]+'→'+s2a(bst.move.tr,bst.move.tc))}txt+=' '+pN+'→'+ds+' ('+ac+'%) — '+rs.join('، ');return{t:txt,a:ac}}catch(e){return{t:'تحلیل ناموفق',a:50}}}
 
 function explAI(bB,mv,aiC,isB){var rs=[],pc=bB[mv.fr][mv.fc],pN=PF[ty(pc)]||'',ds=s2a(mv.tr,mv.tc);if(isB)rs.push('کتابی'+(oNm?' ('+oNm+')':''));if(mv.cas){rs.push('قلعه');return'🤖 '+rs.join('، ')}if(mv.cap)rs.push('گرفتن '+PF[ty(mv.cap)]);if(mv.pp)rs.push('ارتقاء');var tb=cln(bB);var tm={fr:mv.fr,fc:mv.fc,tr:mv.tr,tc:mv.tc,cap:mv.cap,cas:mv.cas,epc:mv.epc,epp:mv.epp,pp:mv.pp};appM(tb,tm);if(iCk(tb,aiC==='w'?'b':'w'))rs.push('کیش!');var bk=aiC==='w'?7:0;if(mv.fr===bk&&(ty(pc)==='N'||ty(pc)==='B'))rs.push('توسعه '+pN);if((mv.tr===3||mv.tr===4)&&(mv.tc===3||mv.tc===4))rs.push('کنترل مرکز');if(!rs.length)rs.push('بهبود موقعیت');return'🤖 '+pN+'→'+ds+' — '+rs.join('، ')}
 
