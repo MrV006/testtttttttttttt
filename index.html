@@ -323,7 +323,7 @@ function fK(b,col){var k=col==='w'?'K':'k';for(var i=0;i<8;i++)for(var j=0;j<8;j
 function iCk(b,col){var kp=fK(b,col);return kp?sAt(b,kp[0],kp[1],col==='w'?'b':'w'):false}
 function leg(b,r,c,col,c2,eps){var mvs=raw(b,r,c,col,eps);if(ty(b[r][c])==='K'){var cm=casM(b,col,c2);for(var i=0;i<cm.length;i++)mvs.push(cm[i])}var out=[];for(var j=0;j<mvs.length;j++){appM(b,mvs[j]);var ok=!iCk(b,col);undMv(b,mvs[j]);if(ok)out.push(mvs[j])}return out}
 function aLeg(b,col,c2,eps){var a=[];for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&co(b[i][j])===col){var m=leg(b,i,j,col,c2,eps);for(var k=0;k<m.length;k++)a.push(m[k])}return a}
-function ev(b){
+function ev(b, c2){
   var s=0;
   var wB=0, bB=0;
   var wP=[0,0,0,0,0,0,0,0], bP=[0,0,0,0,0,0,0,0];
@@ -430,18 +430,185 @@ function ev(b){
   s -= Math.round((wShieldPenalty * phase) / 24);
   s += Math.round((bShieldPenalty * phase) / 24);
   
+  if (c2) {
+    var wCastled = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
+    if (!wCastled) {
+      if (!c2.wk && !c2.wq) {
+        s -= 250;
+      } else {
+        if (!c2.wk) s -= 75;
+        if (!c2.wq) s -= 75;
+      }
+    }
+    var bCastled = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
+    if (!bCastled) {
+      if (!c2.bk && !c2.bq) {
+        s += 250;
+      } else {
+        if (!c2.bk) s += 75;
+        if (!c2.bq) s += 75;
+      }
+    }
+  }
+  
   return s;
 }
 var killerMoves = {};
 var historyTable = new Int32Array(4096);
 
+function getLeastValuableAttacker(b, tr, tc, col) {
+  var pd = col === 'w' ? 1 : -1;
+  var bestAtt = null;
+  var minVal = 999999;
+  
+  function updateBest(r, c, p) {
+    var val = PV[ty(p)] || 0;
+    if (val < minVal) {
+      minVal = val;
+      bestAtt = {r: r, c: c, val: val, p: p};
+    }
+  }
+
+  // Pawns
+  for (var dc = -1; dc <= 1; dc += 2) {
+    var pr = tr + pd, pc = tc + dc;
+    if (pr >= 0 && pr < 8 && pc >= 0 && pc < 8) {
+      var p = b[pr][pc];
+      if (p && co(p) === col && ty(p) === 'P') {
+        updateBest(pr, pc, p);
+      }
+    }
+  }
+  if (bestAtt) return bestAtt;
+
+  // Knights
+  var kd = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  for (var i = 0; i < 8; i++) {
+    var nr = tr + kd[i][0], nc = tc + kd[i][1];
+    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+      var p = b[nr][nc];
+      if (p && co(p) === col && ty(p) === 'N') {
+        updateBest(nr, nc, p);
+      }
+    }
+  }
+
+  // Bishops / Queens
+  var dg = [[1,1],[1,-1],[-1,1],[-1,-1]];
+  for (var i = 0; i < 4; i++) {
+    var nr = tr + dg[i][0], nc = tc + dg[i][1];
+    while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+      var p = b[nr][nc];
+      if (p) {
+        if (co(p) === col && (ty(p) === 'B' || ty(p) === 'Q')) {
+          updateBest(nr, nc, p);
+        }
+        break;
+      }
+      nr += dg[i][0];
+      nc += dg[i][1];
+    }
+  }
+
+  // Rooks / Queens
+  var sl = [[0,1],[0,-1],[1,0],[-1,0]];
+  for (var i = 0; i < 4; i++) {
+    var nr = tr + sl[i][0], nc = tc + sl[i][1];
+    while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+      var p = b[nr][nc];
+      if (p) {
+        if (co(p) === col && (ty(p) === 'R' || ty(p) === 'Q')) {
+          updateBest(nr, nc, p);
+        }
+        break;
+      }
+      nr += sl[i][0];
+      nc += sl[i][1];
+    }
+  }
+
+  // Kings
+  var kk = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+  for (var i = 0; i < 8; i++) {
+    var nr = tr + kk[i][0], nc = tc + kk[i][1];
+    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+      var p = b[nr][nc];
+      if (p && co(p) === col && ty(p) === 'K') {
+        updateBest(nr, nc, p);
+      }
+    }
+  }
+
+  return bestAtt;
+}
+
+function see(b, mv) {
+  var tr = mv.tr, tc = mv.tc;
+  var victim = b[tr][tc];
+  if (!victim) {
+    if (mv.epp) {
+      victim = co(b[mv.fr][mv.fc]) === 'w' ? 'p' : 'P';
+    } else {
+      return 0;
+    }
+  }
+  var victimVal = PV[ty(victim)] || 0;
+  var attacker = b[mv.fr][mv.fc];
+  if (!attacker) return 0;
+  var attackerVal = PV[ty(attacker)] || 0;
+
+  var gain = [];
+  gain[0] = victimVal + (mv.pp ? (PV[ty(mv.pp)] - 100) : 0);
+
+  var simB = cln(b);
+  simB[tr][tc] = attacker;
+  simB[mv.fr][mv.fc] = E;
+
+  var activeCol = co(attacker) === 'w' ? 'b' : 'w';
+  var depth = 1;
+  var currentVictimVal = mv.pp ? (PV[ty(mv.pp)] || 900) : attackerVal;
+
+  while (depth < 32) {
+    var bestAttacker = getLeastValuableAttacker(simB, tr, tc, activeCol);
+    if (!bestAttacker) break;
+
+    var attPiece = simB[bestAttacker.r][bestAttacker.c];
+    var attVal = PV[ty(attPiece)] || 0;
+
+    gain[depth] = currentVictimVal;
+    currentVictimVal = attVal;
+
+    simB[tr][tc] = attPiece;
+    simB[bestAttacker.r][bestAttacker.c] = E;
+
+    activeCol = activeCol === 'w' ? 'b' : 'w';
+    depth++;
+  }
+
+  depth--;
+  while (depth > 0) {
+    gain[depth - 1] = Math.max(0, gain[depth - 1] - gain[depth]);
+    depth--;
+  }
+  return gain[0];
+}
+
 function ord(b,mvs,d){
+  for (var i = 0; i < mvs.length; i++) {
+    var m = mvs[i];
+    if (m.cap) {
+      m.seeVal = see(b, m);
+    }
+  }
   mvs.sort(function(a,z){
     var sa=0,sz=0;
     if(a.cap) {
-      var victimVal = PV[ty(a.cap)]||0;
-      var attackerVal = PV[ty(b[a.fr][a.fc])]||100;
-      sa += 100000 + victimVal * 100 - attackerVal;
+      var seeVal = a.seeVal !== undefined ? a.seeVal : 0;
+      if (seeVal >= 0) {
+        sa += 200000 + seeVal;
+      } else {
+        sa += 10000 + seeVal;
+      }
     } else {
       var fromA = a.fr * 8 + a.fc, toA = a.tr * 8 + a.tc;
       sa += historyTable[fromA * 64 + toA] || 0;
@@ -451,9 +618,12 @@ function ord(b,mvs,d){
       }
     }
     if(z.cap) {
-      var victimVal = PV[ty(z.cap)]||0;
-      var attackerVal = PV[ty(b[z.fr][z.fc])]||100;
-      sz += 100000 + victimVal * 100 - attackerVal;
+      var seeVal = z.seeVal !== undefined ? z.seeVal : 0;
+      if (seeVal >= 0) {
+        sz += 200000 + seeVal;
+      } else {
+        sz += 10000 + seeVal;
+      }
     } else {
       var fromZ = z.fr * 8 + z.fc, toZ = z.tr * 8 + z.tc;
       sz += historyTable[fromZ * 64 + toZ] || 0;
@@ -469,15 +639,15 @@ function ord(b,mvs,d){
     return sz-sa;
   });
 }
-function qsh(b,al,bt,mx){
-var val=ev(b);
+function qsh(b,al,bt,mx,c2){
+var val=ev(b,c2);
 if(mx){
 if(val>=bt)return val;
 if(val>al)al=val;
 var mvs=aLeg(b,'w',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
 ord(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,false);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2);undMv(b,mvs[i]);
 if(s>=bt)return bt;
 if(s>al)al=s;
 }
@@ -488,7 +658,7 @@ if(val<bt)bt=val;
 var mvs=aLeg(b,'b',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
 ord(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,true);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2);undMv(b,mvs[i]);
 if(s<=al)return al;
 if(s<bt)bt=s;
 }
@@ -499,10 +669,34 @@ var globalStartTime = 0;
 var globalTimeLimit = 0;
 var globalAborted = false;
 var nodeCount = 0;
+var gameHashes = [];
+var searchPath = [];
 
 function hasMat(b,col){var tCol=col==='w';for(var r=0;r<8;r++)for(var c=0;c<8;c++){var p=b[r][c];if(p&&ty(p)!=='K'&&ty(p)!=='P'&&((p===p.toUpperCase())===tCol))return true}return false}
 
 function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
+  var h = getHash(b,mx,c2,eps);
+  var isRep = false;
+  if(searchPath.indexOf(h) !== -1){
+    isRep = true;
+  } else {
+    for(var idx = 0; idx < gameHashes.length - 1; idx++){
+      if(gameHashes[idx] === h){
+        isRep = true;
+        break;
+      }
+    }
+  }
+  if(isRep){
+    return {s: 0};
+  }
+  searchPath.push(h);
+  var res = mmxCore(b,d,al,bt,mx,c2,eps,nmpOk);
+  searchPath.pop();
+  return res;
+}
+
+function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
   nodeCount++;
   if(nodeCount % 1024 === 0) {
     if(Date.now() - globalStartTime >= globalTimeLimit) {
@@ -513,9 +707,9 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
 
   var h=getHash(b,mx,c2,eps);
   if(TT[h]&&TT[h].depth>=d)return TT[h].val;
-  if(d<=0)return{s:qsh(b,al,bt,mx)};
+  if(d<=0)return{s:qsh(b,al,bt,mx,c2)};
   var col=mx?'w':'b',mvs=aLeg(b,col,c2,eps);
-  if(!mvs.length){if(iCk(b,col))return{s:mx?-99999+d*100:99999-d*100};return{s:0}}
+  if(!mvs.length){if(iCk(b,col))return{s:mx?-99999-d*100:99999+d*100};return{s:0}}
   for(var i=0;i<mvs.length;i++){if(mvs[i].pro)mvs[i]={fr:mvs[i].fr,fc:mvs[i].fc,tr:mvs[i].tr,tc:mvs[i].tc,cap:mvs[i].cap,pro:false,pp:col==='w'?'Q':'q',cas:mvs[i].cas,epc:mvs[i].epc,epp:mvs[i].epp}}
   ord(b,mvs,d);
   if(TT[h]&&TT[h].move){
@@ -534,7 +728,21 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
       if(nullS.s>=bt)return {s:bt};
     }
     var mE=-1e9;
+    var staticEval = (d <= 2) ? ev(b,c2) : 0;
+    var futilityMargin = d === 1 ? 150 : 300;
     for(i=0;i<mvs.length;i++){
+      if(d <= 2 && i > 0 && !iCk(b,'w')){
+        if(staticEval + futilityMargin <= al){
+          if(!mvs[i].cap && !mvs[i].pp && !mvs[i].pro){
+            appM(b,mvs[i]);
+            var givesCheck = iCk(b,'b');
+            undMv(b,mvs[i]);
+            if(!givesCheck){
+              continue; // Futility Pruned
+            }
+          }
+        }
+      }
       appM(b,mvs[i]);
       var nc={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc,mvs[i]);
@@ -588,7 +796,21 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
       if(nullS2.s<=al)return {s:al};
     }
     var mE2=1e9;
+    var staticEval = (d <= 2) ? ev(b,c2) : 0;
+    var futilityMargin = d === 1 ? 150 : 300;
     for(i=0;i<mvs.length;i++){
+      if(d <= 2 && i > 0 && !iCk(b,'b')){
+        if(staticEval - futilityMargin >= bt){
+          if(!mvs[i].cap && !mvs[i].pp && !mvs[i].pro){
+            appM(b,mvs[i]);
+            var givesCheck = iCk(b,'w');
+            undMv(b,mvs[i]);
+            if(!givesCheck){
+              continue; // Futility Pruned
+            }
+          }
+        }
+      }
       appM(b,mvs[i]);
       var nc2={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc2,mvs[i]);
@@ -649,6 +871,8 @@ self.onmessage=function(e){
     globalTimeLimit = d.timeLimit || 2500;
     globalAborted = false;
     nodeCount = 0;
+    gameHashes = d.gameHashes || [];
+    searchPath = [];
     
     var maxDepth = d.d;
     var bestResult = null;
@@ -857,7 +1081,7 @@ function iCk(b,col){var kp=fK(b,col);return kp?sAt(b,kp[0],kp[1],col==='w'?'b':'
 function leg(b,r,c,col,c2,eps){var mvs=raw(b,r,c,col,eps);if(ty(b[r][c])==='K'){var cm=casM(b,col,c2);for(var i=0;i<cm.length;i++)mvs.push(cm[i])}var out=[];for(var j=0;j<mvs.length;j++){appM(b,mvs[j]);var ok=!iCk(b,col);undMv(b,mvs[j]);if(ok)out.push(mvs[j])}return out}
 function aLeg(b,col,c2,eps){var a=[];for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&co(b[i][j])===col){var m=leg(b,i,j,col,c2,eps);for(var k=0;k<m.length;k++)a.push(m[k])}return a}
 
-function ev(b){
+function ev(b, c2){
   var s=0;
   var wB=0, bB=0;
   var wP=[0,0,0,0,0,0,0,0], bP=[0,0,0,0,0,0,0,0];
@@ -964,6 +1188,27 @@ function ev(b){
   s -= Math.round((wShieldPenalty * phase) / 24);
   s += Math.round((bShieldPenalty * phase) / 24);
   
+  if (c2) {
+    var wCastled = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
+    if (!wCastled) {
+      if (!c2.wk && !c2.wq) {
+        s -= 250;
+      } else {
+        if (!c2.wk) s -= 75;
+        if (!c2.wq) s -= 75;
+      }
+    }
+    var bCastled = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
+    if (!bCastled) {
+      if (!c2.bk && !c2.bq) {
+        s += 250;
+      } else {
+        if (!c2.bk) s += 75;
+        if (!c2.bq) s += 75;
+      }
+    }
+  }
+  
   return s;
 }
 var MT_TT={};
@@ -977,13 +1222,159 @@ function getHashMT(b,mx,c2,eps){
 var MT_killerMoves = {};
 var MT_historyTable = new Int32Array(4096);
 
+function getLeastValuableAttacker(b, tr, tc, col) {
+  var pd = col === 'w' ? 1 : -1;
+  var bestAtt = null;
+  var minVal = 999999;
+  
+  function updateBest(r, c, p) {
+    var val = PV[ty(p)] || 0;
+    if (val < minVal) {
+      minVal = val;
+      bestAtt = {r: r, c: c, val: val, p: p};
+    }
+  }
+
+  // Pawns
+  for (var dc = -1; dc <= 1; dc += 2) {
+    var pr = tr + pd, pc = tc + dc;
+    if (pr >= 0 && pr < 8 && pc >= 0 && pc < 8) {
+      var p = b[pr][pc];
+      if (p && co(p) === col && ty(p) === 'P') {
+        updateBest(pr, pc, p);
+      }
+    }
+  }
+  if (bestAtt) return bestAtt;
+
+  // Knights
+  var kd = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  for (var i = 0; i < 8; i++) {
+    var nr = tr + kd[i][0], nc = tc + kd[i][1];
+    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+      var p = b[nr][nc];
+      if (p && co(p) === col && ty(p) === 'N') {
+        updateBest(nr, nc, p);
+      }
+    }
+  }
+
+  // Bishops / Queens
+  var dg = [[1,1],[1,-1],[-1,1],[-1,-1]];
+  for (var i = 0; i < 4; i++) {
+    var nr = tr + dg[i][0], nc = tc + dg[i][1];
+    while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+      var p = b[nr][nc];
+      if (p) {
+        if (co(p) === col && (ty(p) === 'B' || ty(p) === 'Q')) {
+          updateBest(nr, nc, p);
+        }
+        break;
+      }
+      nr += dg[i][0];
+      nc += dg[i][1];
+    }
+  }
+
+  // Rooks / Queens
+  var sl = [[0,1],[0,-1],[1,0],[-1,0]];
+  for (var i = 0; i < 4; i++) {
+    var nr = tr + sl[i][0], nc = tc + sl[i][1];
+    while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+      var p = b[nr][nc];
+      if (p) {
+        if (co(p) === col && (ty(p) === 'R' || ty(p) === 'Q')) {
+          updateBest(nr, nc, p);
+        }
+        break;
+      }
+      nr += sl[i][0];
+      nc += sl[i][1];
+    }
+  }
+
+  // Kings
+  var kk = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+  for (var i = 0; i < 8; i++) {
+    var nr = tr + kk[i][0], nc = tc + kk[i][1];
+    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+      var p = b[nr][nc];
+      if (p && co(p) === col && ty(p) === 'K') {
+        updateBest(nr, nc, p);
+      }
+    }
+  }
+
+  return bestAtt;
+}
+
+function see(b, mv) {
+  var tr = mv.tr, tc = mv.tc;
+  var victim = b[tr][tc];
+  if (!victim) {
+    if (mv.epp) {
+      victim = co(b[mv.fr][mv.fc]) === 'w' ? 'p' : 'P';
+    } else {
+      return 0;
+    }
+  }
+  var victimVal = PV[ty(victim)] || 0;
+  var attacker = b[mv.fr][mv.fc];
+  if (!attacker) return 0;
+  var attackerVal = PV[ty(attacker)] || 0;
+
+  var gain = [];
+  gain[0] = victimVal + (mv.pp ? (PV[ty(mv.pp)] - 100) : 0);
+
+  var simB = cln(b);
+  simB[tr][tc] = attacker;
+  simB[mv.fr][mv.fc] = E;
+
+  var activeCol = co(attacker) === 'w' ? 'b' : 'w';
+  var depth = 1;
+  var currentVictimVal = mv.pp ? (PV[ty(mv.pp)] || 900) : attackerVal;
+
+  while (depth < 32) {
+    var bestAttacker = getLeastValuableAttacker(simB, tr, tc, activeCol);
+    if (!bestAttacker) break;
+
+    var attPiece = simB[bestAttacker.r][bestAttacker.c];
+    var attVal = PV[ty(attPiece)] || 0;
+
+    gain[depth] = currentVictimVal;
+    currentVictimVal = attVal;
+
+    simB[tr][tc] = attPiece;
+    simB[bestAttacker.r][bestAttacker.c] = E;
+
+    activeCol = activeCol === 'w' ? 'b' : 'w';
+    depth++;
+  }
+
+  depth--;
+  while (depth > 0) {
+    gain[depth - 1] = Math.max(0, gain[depth - 1] - gain[depth]);
+    depth--;
+  }
+  return gain[0];
+}
+
 function ordMT(b,mvs,d){
+  for (var i = 0; i < mvs.length; i++) {
+    var m = mvs[i];
+    if (m.cap) {
+      m.seeVal = see(b, m);
+    }
+  }
   mvs.sort(function(a,z){
     var sa=0,sz=0;
     if(a.cap) {
-      var victimVal = PV[ty(a.cap)]||0;
-      var attackerVal = PV[ty(b[a.fr][a.fc])]||100;
-      sa += 100000 + victimVal * 100 - attackerVal;
+      var seeVal = a.seeVal !== undefined ? a.seeVal : 0;
+      if (seeVal >= 0) {
+        sa += 200000 + seeVal;
+      } else {
+        sa += 10000 + seeVal;
+      }
     } else {
       var fromA = a.fr * 8 + a.fc, toA = a.tr * 8 + a.tc;
       sa += MT_historyTable[fromA * 64 + toA] || 0;
@@ -993,9 +1384,12 @@ function ordMT(b,mvs,d){
       }
     }
     if(z.cap) {
-      var victimVal = PV[ty(z.cap)]||0;
-      var attackerVal = PV[ty(b[z.fr][z.fc])]||100;
-      sz += 100000 + victimVal * 100 - attackerVal;
+      var seeVal = z.seeVal !== undefined ? z.seeVal : 0;
+      if (seeVal >= 0) {
+        sz += 200000 + seeVal;
+      } else {
+        sz += 10000 + seeVal;
+      }
     } else {
       var fromZ = z.fr * 8 + z.fc, toZ = z.tr * 8 + z.tc;
       sz += MT_historyTable[fromZ * 64 + toZ] || 0;
@@ -1011,15 +1405,15 @@ function ordMT(b,mvs,d){
     return sz-sa;
   });
 }
-function qsh(b,al,bt,mx){
-var val=ev(b);
+function qsh(b,al,bt,mx,c2){
+var val=ev(b,c2);
 if(mx){
 if(val>=bt)return val;
 if(val>al)al=val;
 var mvs=aLeg(b,'w',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
 ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,false);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2);undMv(b,mvs[i]);
 if(s>=bt)return bt;
 if(s>al)al=s;
 }
@@ -1030,7 +1424,7 @@ if(val<bt)bt=val;
 var mvs=aLeg(b,'b',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
 ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,true);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2);undMv(b,mvs[i]);
 if(s<=al)return al;
 if(s<bt)bt=s;
 }
@@ -1039,12 +1433,38 @@ return bt;
 }
 function hasMat(b,col){var tCol=col==='w';for(var r=0;r<8;r++)for(var c=0;c<8;c++){var p=b[r][c];if(p&&ty(p)!=='K'&&ty(p)!=='P'&&((p===p.toUpperCase())===tCol))return true}return false}
 
+var MT_searchPath = [];
 function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
+  var h = getHashMT(b,mx,c2,eps);
+  var isRep = false;
+  if(MT_searchPath.indexOf(h) !== -1){
+    isRep = true;
+  } else {
+    var mgh = GR.map(function(g) {
+      return getHashMT(g.bd, g.tn === 'w', g.cas, g.ep);
+    });
+    for(var idx = 0; idx < mgh.length - 1; idx++){
+      if(mgh[idx] === h){
+        isRep = true;
+        break;
+      }
+    }
+  }
+  if(isRep){
+    return {s: 0};
+  }
+  MT_searchPath.push(h);
+  var res = mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk);
+  MT_searchPath.pop();
+  return res;
+}
+
+function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
   var h=getHashMT(b,mx,c2,eps);
   if(MT_TT[h]&&MT_TT[h].depth>=d)return MT_TT[h].val;
-  if(d<=0)return{s:qsh(b,al,bt,mx)};
+  if(d<=0)return{s:qsh(b,al,bt,mx,c2)};
   var col=mx?'w':'b',mvs=aLeg(b,col,c2,eps);
-  if(!mvs.length){if(iCk(b,col))return{s:mx?-99999+d*100:99999-d*100};return{s:0}}
+  if(!mvs.length){if(iCk(b,col))return{s:mx?-99999-d*100:99999+d*100};return{s:0}}
   for(var i=0;i<mvs.length;i++){if(mvs[i].pro)mvs[i]={fr:mvs[i].fr,fc:mvs[i].fc,tr:mvs[i].tr,tc:mvs[i].tc,cap:mvs[i].cap,pro:false,pp:col==='w'?'Q':'q',cas:mvs[i].cas,epc:mvs[i].epc,epp:mvs[i].epp}}
   ordMT(b,mvs,d);
   if(MT_TT[h]&&MT_TT[h].move){
@@ -1063,7 +1483,21 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
       if(nullS.s>=bt)return {s:bt};
     }
     var mE=-1e9;
+    var staticEval = (d <= 2) ? ev(b,c2) : 0;
+    var futilityMargin = d === 1 ? 150 : 300;
     for(i=0;i<mvs.length;i++){
+      if(d <= 2 && i > 0 && !iCk(b,'w')){
+        if(staticEval + futilityMargin <= al){
+          if(!mvs[i].cap && !mvs[i].pp && !mvs[i].pro){
+            appM(b,mvs[i]);
+            var givesCheck = iCk(b,'b');
+            undMv(b,mvs[i]);
+            if(!givesCheck){
+              continue; // Futility Pruned
+            }
+          }
+        }
+      }
       appM(b,mvs[i]);
       var nc={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc,mvs[i]);
@@ -1114,7 +1548,21 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
       if(nullS2.s<=al)return {s:al};
     }
     var mE2=1e9;
+    var staticEval = (d <= 2) ? ev(b,c2) : 0;
+    var futilityMargin = d === 1 ? 150 : 300;
     for(i=0;i<mvs.length;i++){
+      if(d <= 2 && i > 0 && !iCk(b,'b')){
+        if(staticEval - futilityMargin >= bt){
+          if(!mvs[i].cap && !mvs[i].pp && !mvs[i].pro){
+            appM(b,mvs[i]);
+            var givesCheck = iCk(b,'w');
+            undMv(b,mvs[i]);
+            if(!givesCheck){
+              continue; // Futility Pruned
+            }
+          }
+        }
+      }
       appM(b,mvs[i]);
       var nc2={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc2,mvs[i]);
@@ -1267,7 +1715,10 @@ function aiTn(){
           mx:mx,
           c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},
           eps:epq,
-          timeLimit:timeLimit
+          timeLimit:timeLimit,
+          gameHashes: GR.map(function(g) {
+            return getHashMT(g.bd, g.tn === 'w', g.cas, g.ep);
+          })
         });
       }
     } catch(e) {
@@ -1280,7 +1731,7 @@ function aiTn(){
   },60);
 }
 
-function getHint(){if(ov||tn!==PC||aOn)return;addA('<span class="pu">💡تحلیل...</span>',false,-1);setTimeout(function(){try{var mx=PC==='w',d=Math.min(df+1,5);terminateWorker();var worker=getWorker();var curWorkerMvId=Date.now();worker.onmessage=function(e){if(e.data.type==='result'&&e.data.id===curWorkerMvId){var res=e.data.res;if(res.move){var m=res.move;var p=bd[m.fr][m.fc];var ap=document.getElementById('ap');if(ap.lastElementChild)ap.lastElementChild.innerHTML='💡 '+(PF[ty(p)]||'')+' '+s2a(m.fr,m.fc)+'→'+s2a(m.tr,m.tc);sel=[m.fr,m.fc];pms=[m];ren();var cells=document.getElementById('brd').children;for(var ci=0;ci<cells.length;ci++){var di=Math.floor(ci/8),dj=ci%8;var r2=fl?7-di:di,c2=fl?7-dj:dj;if((r2===m.fr&&c2===m.fc)||(r2===m.tr&&c2===m.tc))cells[ci].classList.add('hn')}setTimeout(function(){sel=E;pms=[];ren()},3000)}}};worker.postMessage({type:'minimax',id:curWorkerMvId,bd:cln(bd),d:d,al:-1e9,bt:1e9,mx:mx,c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},eps:epq})}catch(e){}},50)}
+function getHint(){if(ov||tn!==PC||aOn)return;addA('<span class="pu">💡تحلیل...</span>',false,-1);setTimeout(function(){try{var mx=PC==='w',d=Math.min(df+1,5);terminateWorker();var worker=getWorker();var curWorkerMvId=Date.now();worker.onmessage=function(e){if(e.data.type==='result'&&e.data.id===curWorkerMvId){var res=e.data.res;if(res.move){var m=res.move;var p=bd[m.fr][m.fc];var ap=document.getElementById('ap');if(ap.lastElementChild)ap.lastElementChild.innerHTML='💡 '+(PF[ty(p)]||'')+' '+s2a(m.fr,m.fc)+'→'+s2a(m.tr,m.tc);sel=[m.fr,m.fc];pms=[m];ren();var cells=document.getElementById('brd').children;for(var ci=0;ci<cells.length;ci++){var di=Math.floor(ci/8),dj=ci%8;var r2=fl?7-di:di,c2=fl?7-dj:dj;if((r2===m.fr&&c2===m.fc)||(r2===m.tr&&c2===m.tc))cells[ci].classList.add('hn')}setTimeout(function(){sel=E;pms=[];ren()},3000)}}};worker.postMessage({type:'minimax',id:curWorkerMvId,bd:cln(bd),d:d,al:-1e9,bt:1e9,mx:mx,c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},eps:epq,gameHashes:GR.map(function(g){return getHashMT(g.bd,g.tn==='w',g.cas,g.ep)})})}catch(e){}},50)}
 
 function undoM(){terminateWorker();if(aOn){aOn=false;if(hs.length>0){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}else{if(hs.length<2)return;for(var i=0;i<2&&hs.length>0;i++){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}while(GR.length>mn+1)GR.pop();ov=false;sel=E;pms=[];ren();upSt()}
 function endAn(){var pM=GR.filter(function(g){return g.ip&&g.ac>=0});if(!pM.length)return;var avg=Math.round(pM.reduce(function(s,g){return s+g.ac},0)/pM.length);addA('📊 دقت: '+avg+'% — 🔍بازبینی کنید',false,-1)}
