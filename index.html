@@ -328,6 +328,7 @@ function ev(b, c2){
   var wB=0, bB=0;
   var wP=[0,0,0,0,0,0,0,0], bP=[0,0,0,0,0,0,0,0];
   var wK=[-1,-1], bK=[-1,-1];
+  var wHasQueen=false, bHasQueen=false;
   
   var phaseWeight = { 'N': 1, 'B': 1, 'R': 2, 'Q': 4 };
   var totalPhase = 0;
@@ -369,6 +370,8 @@ function ev(b, c2){
         if(c==='w') wP[j]++; else bP[j]++;
       } else if(t2==='K'){
         if(c==='w') wK=[i,j]; else bK=[i,j];
+      } else if(t2==='Q'){
+        if(c==='w') wHasQueen=true; else bHasQueen=true;
       }
     }
   }
@@ -418,13 +421,23 @@ function ev(b, c2){
   if(wK[0]!==-1){
     var kc=wK[1];
     for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
-      if(wP[f]===0) wShieldPenalty += 25;
+      if(wP[f]===0) wShieldPenalty += bHasQueen ? 45 : 15;
+    }
+    for(var i=0; i<8; i++){
+      if(b[i][kc] === 'r' || b[i][kc] === 'q'){
+        wShieldPenalty += bHasQueen ? 35 : 15;
+      }
     }
   }
   if(bK[0]!==-1){
     var kc=bK[1];
     for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
-      if(bP[f]===0) bShieldPenalty += 25;
+      if(bP[f]===0) bShieldPenalty += wHasQueen ? 45 : 15;
+    }
+    for(var i=0; i<8; i++){
+      if(b[i][kc] === 'R' || b[i][kc] === 'Q'){
+        bShieldPenalty += wHasQueen ? 35 : 15;
+      }
     }
   }
   s -= Math.round((wShieldPenalty * phase) / 24);
@@ -640,6 +653,29 @@ function ord(b,mvs,d){
   });
 }
 function qsh(b,al,bt,mx,c2){
+var col=mx?'w':'b';
+var inCheck=iCk(b,col);
+if(inCheck){
+var mvs=aLeg(b,col,{wk:0,wq:0,bk:0,bq:0},E);
+if(!mvs.length)return mx?-99000:99000;
+if(mx){
+ord(b,mvs);
+for(var i=0;i<mvs.length;i++){
+appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2);undMv(b,mvs[i]);
+if(s>=bt)return bt;
+if(s>al)al=s;
+}
+return al;
+}else{
+ord(b,mvs);
+for(var i=0;i<mvs.length;i++){
+appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2);undMv(b,mvs[i]);
+if(s<=al)return al;
+if(s<bt)bt=s;
+}
+return bt;
+}
+}
 var val=ev(b,c2);
 if(mx){
 if(val>=bt)return val;
@@ -708,8 +744,9 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
   var h=getHash(b,mx,c2,eps);
   if(TT[h]&&TT[h].depth>=d)return TT[h].val;
   if(d<=0)return{s:qsh(b,al,bt,mx,c2)};
-  var col=mx?'w':'b',mvs=aLeg(b,col,c2,eps);
-  if(!mvs.length){if(iCk(b,col))return{s:mx?-99999-d*100:99999+d*100};return{s:0}}
+  var col=mx?'w':'b',inCheck=iCk(b,col),mvs=aLeg(b,col,c2,eps);
+  if(!mvs.length){if(inCheck)return{s:mx?-99999-d*100:99999+d*100};return{s:0}}
+  if(inCheck && d < 8) d++;
   for(var i=0;i<mvs.length;i++){if(mvs[i].pro)mvs[i]={fr:mvs[i].fr,fc:mvs[i].fc,tr:mvs[i].tr,tc:mvs[i].tc,cap:mvs[i].cap,pro:false,pp:col==='w'?'Q':'q',cas:mvs[i].cas,epc:mvs[i].epc,epp:mvs[i].epp}}
   ord(b,mvs,d);
   if(TT[h]&&TT[h].move){
@@ -1086,6 +1123,7 @@ function ev(b, c2){
   var wB=0, bB=0;
   var wP=[0,0,0,0,0,0,0,0], bP=[0,0,0,0,0,0,0,0];
   var wK=[-1,-1], bK=[-1,-1];
+  var wHasQueen=false, bHasQueen=false;
   
   var phaseWeight = { 'N': 1, 'B': 1, 'R': 2, 'Q': 4 };
   var totalPhase = 0;
@@ -1127,6 +1165,8 @@ function ev(b, c2){
         if(c==='w') wP[j]++; else bP[j]++;
       } else if(t2==='K'){
         if(c==='w') wK=[i,j]; else bK=[i,j];
+      } else if(t2==='Q'){
+        if(c==='w') wHasQueen=true; else bHasQueen=true;
       }
     }
   }
@@ -1176,13 +1216,23 @@ function ev(b, c2){
   if(wK[0]!==-1){
     var kc=wK[1];
     for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
-      if(wP[f]===0) wShieldPenalty += 25;
+      if(wP[f]===0) wShieldPenalty += bHasQueen ? 45 : 15;
+    }
+    for(var i=0; i<8; i++){
+      if(b[i][kc] === 'r' || b[i][kc] === 'q'){
+        wShieldPenalty += bHasQueen ? 35 : 15;
+      }
     }
   }
   if(bK[0]!==-1){
     var kc=bK[1];
     for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
-      if(bP[f]===0) bShieldPenalty += 25;
+      if(bP[f]===0) bShieldPenalty += wHasQueen ? 45 : 15;
+    }
+    for(var i=0; i<8; i++){
+      if(b[i][kc] === 'R' || b[i][kc] === 'Q'){
+        bShieldPenalty += wHasQueen ? 35 : 15;
+      }
     }
   }
   s -= Math.round((wShieldPenalty * phase) / 24);
@@ -1406,6 +1456,29 @@ function ordMT(b,mvs,d){
   });
 }
 function qsh(b,al,bt,mx,c2){
+var col=mx?'w':'b';
+var inCheck=iCk(b,col);
+if(inCheck){
+var mvs=aLeg(b,col,{wk:0,wq:0,bk:0,bq:0},E);
+if(!mvs.length)return mx?-99000:99000;
+if(mx){
+ordMT(b,mvs);
+for(var i=0;i<mvs.length;i++){
+appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2);undMv(b,mvs[i]);
+if(s>=bt)return bt;
+if(s>al)al=s;
+}
+return al;
+}else{
+ordMT(b,mvs);
+for(var i=0;i<mvs.length;i++){
+appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2);undMv(b,mvs[i]);
+if(s<=al)return al;
+if(s<bt)bt=s;
+}
+return bt;
+}
+}
 var val=ev(b,c2);
 if(mx){
 if(val>=bt)return val;
@@ -1463,8 +1536,9 @@ function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
   var h=getHashMT(b,mx,c2,eps);
   if(MT_TT[h]&&MT_TT[h].depth>=d)return MT_TT[h].val;
   if(d<=0)return{s:qsh(b,al,bt,mx,c2)};
-  var col=mx?'w':'b',mvs=aLeg(b,col,c2,eps);
-  if(!mvs.length){if(iCk(b,col))return{s:mx?-99999-d*100:99999+d*100};return{s:0}}
+  var col=mx?'w':'b',inCheck=iCk(b,col),mvs=aLeg(b,col,c2,eps);
+  if(!mvs.length){if(inCheck)return{s:mx?-99999-d*100:99999+d*100};return{s:0}}
+  if(inCheck && d < 8) d++;
   for(var i=0;i<mvs.length;i++){if(mvs[i].pro)mvs[i]={fr:mvs[i].fr,fc:mvs[i].fc,tr:mvs[i].tr,tc:mvs[i].tc,cap:mvs[i].cap,pro:false,pp:col==='w'?'Q':'q',cas:mvs[i].cas,epc:mvs[i].epc,epp:mvs[i].epp}}
   ordMT(b,mvs,d);
   if(MT_TT[h]&&MT_TT[h].move){
