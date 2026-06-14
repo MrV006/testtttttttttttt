@@ -284,6 +284,7 @@ function playSound(t){if(sfx[t]){sfx[t].currentTime=0;sfx[t].play().catch(functi
 var workerBlobUrl=null,aiWorker=null;
 var WORKER_CODE=`var E=null;
 var TT={};
+var searchPly=0;
 function getHash(b,mx,c2,eps){
   var s=mx?'w':'b';
   s+=c2.wk+''+c2.wq+''+c2.bk+''+c2.bq;
@@ -598,10 +599,13 @@ function see(b, mv) {
     depth++;
   }
 
-  depth--;
-  while (depth > 0) {
-    gain[depth - 1] = Math.max(0, gain[depth - 1] - gain[depth]);
-    depth--;
+  var i = depth - 1;
+  while (i > 1) {
+    gain[i - 1] = Math.max(0, gain[i - 1] - gain[i]);
+    i--;
+  }
+  if (i > 0) {
+    gain[0] = gain[0] - gain[1];
   }
   return gain[0];
 }
@@ -727,12 +731,16 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
     return {s: 0};
   }
   searchPath.push(h);
+  searchPly++;
   var res = mmxCore(b,d,al,bt,mx,c2,eps,nmpOk);
+  searchPly--;
   searchPath.pop();
   return res;
 }
 
 function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
+  var origAlpha = al;
+  var origBeta = bt;
   nodeCount++;
   if(nodeCount % 1024 === 0) {
     if(Date.now() - globalStartTime >= globalTimeLimit) {
@@ -742,10 +750,15 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
   if(globalAborted) return {s: 0};
 
   var h=getHash(b,mx,c2,eps);
-  if(TT[h]&&TT[h].depth>=d)return TT[h].val;
+  var entry=TT[h];
+  if(entry&&entry.depth>=d){
+    if(entry.flag===0)return entry.val;
+    if(entry.flag===1&&entry.val.s<=al)return entry.val;
+    if(entry.flag===2&&entry.val.s>=bt)return entry.val;
+  }
   if(d<=0)return{s:qsh(b,al,bt,mx,c2)};
   var col=mx?'w':'b',inCheck=iCk(b,col),mvs=aLeg(b,col,c2,eps);
-  if(!mvs.length){if(inCheck)return{s:mx?-99999-d*100:99999+d*100};return{s:0}}
+  if(!mvs.length){if(inCheck)return{s:mx?-100000+searchPly:100000-searchPly};return{s:0}}
   if(inCheck && d < 8) d++;
   for(var i=0;i<mvs.length;i++){if(mvs[i].pro)mvs[i]={fr:mvs[i].fr,fc:mvs[i].fc,tr:mvs[i].tr,tc:mvs[i].tc,cap:mvs[i].cap,pro:false,pp:col==='w'?'Q':'q',cas:mvs[i].cas,epc:mvs[i].epc,epp:mvs[i].epp}}
   ord(b,mvs,d);
@@ -765,21 +778,7 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
       if(nullS.s>=bt)return {s:bt};
     }
     var mE=-1e9;
-    var staticEval = (d <= 2) ? ev(b,c2) : 0;
-    var futilityMargin = d === 1 ? 150 : 300;
     for(i=0;i<mvs.length;i++){
-      if(d <= 2 && i > 0 && !iCk(b,'w')){
-        if(staticEval + futilityMargin <= al){
-          if(!mvs[i].cap && !mvs[i].pp && !mvs[i].pro){
-            appM(b,mvs[i]);
-            var givesCheck = iCk(b,'b');
-            undMv(b,mvs[i]);
-            if(!givesCheck){
-              continue; // Futility Pruned
-            }
-          }
-        }
-      }
       appM(b,mvs[i]);
       var nc={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc,mvs[i]);
@@ -824,7 +823,10 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
     }
     var res={s:mE,move:best};
     if(!globalAborted) {
-      TT[h]={depth:d,val:res,move:best};
+      var flag = 0;
+      if (res.s <= origAlpha) flag = 1;
+      else if (res.s >= origBeta) flag = 2;
+      TT[h]={depth:d,val:res,move:best,flag:flag};
     }
     return res;
   }else{
@@ -833,21 +835,7 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
       if(nullS2.s<=al)return {s:al};
     }
     var mE2=1e9;
-    var staticEval = (d <= 2) ? ev(b,c2) : 0;
-    var futilityMargin = d === 1 ? 150 : 300;
     for(i=0;i<mvs.length;i++){
-      if(d <= 2 && i > 0 && !iCk(b,'b')){
-        if(staticEval - futilityMargin >= bt){
-          if(!mvs[i].cap && !mvs[i].pp && !mvs[i].pro){
-            appM(b,mvs[i]);
-            var givesCheck = iCk(b,'w');
-            undMv(b,mvs[i]);
-            if(!givesCheck){
-              continue; // Futility Pruned
-            }
-          }
-        }
-      }
       appM(b,mvs[i]);
       var nc2={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc2,mvs[i]);
@@ -892,7 +880,10 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
     }
     var res2={s:mE2,move:best};
     if(!globalAborted) {
-      TT[h]={depth:d,val:res2,move:best};
+      var flag = 0;
+      if (res2.s <= origAlpha) flag = 1;
+      else if (res2.s >= origBeta) flag = 2;
+      TT[h]={depth:d,val:res2,move:best,flag:flag};
     }
     return res2;
   }
@@ -903,6 +894,7 @@ self.onmessage=function(e){
   if(d.type==='minimax'){
     TT={};
     killerMoves={};
+    searchPly=0;
     for(var i=0;i<4096;i++)historyTable[i]=0;
     globalStartTime = Date.now();
     globalTimeLimit = d.timeLimit || 2500;
@@ -1401,10 +1393,13 @@ function see(b, mv) {
     depth++;
   }
 
-  depth--;
-  while (depth > 0) {
-    gain[depth - 1] = Math.max(0, gain[depth - 1] - gain[depth]);
-    depth--;
+  var i = depth - 1;
+  while (i > 1) {
+    gain[i - 1] = Math.max(0, gain[i - 1] - gain[i]);
+    i--;
+  }
+  if (i > 0) {
+    gain[0] = gain[0] - gain[1];
   }
   return gain[0];
 }
@@ -1507,6 +1502,7 @@ return bt;
 function hasMat(b,col){var tCol=col==='w';for(var r=0;r<8;r++)for(var c=0;c<8;c++){var p=b[r][c];if(p&&ty(p)!=='K'&&ty(p)!=='P'&&((p===p.toUpperCase())===tCol))return true}return false}
 
 var MT_searchPath = [];
+var MT_searchPly = 0;
 function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
   var h = getHashMT(b,mx,c2,eps);
   var isRep = false;
@@ -1527,17 +1523,26 @@ function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
     return {s: 0};
   }
   MT_searchPath.push(h);
+  MT_searchPly++;
   var res = mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk);
+  MT_searchPly--;
   MT_searchPath.pop();
   return res;
 }
 
 function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
+  var origAlpha = al;
+  var origBeta = bt;
   var h=getHashMT(b,mx,c2,eps);
-  if(MT_TT[h]&&MT_TT[h].depth>=d)return MT_TT[h].val;
+  var entry=MT_TT[h];
+  if(entry&&entry.depth>=d){
+    if(entry.flag===0)return entry.val;
+    if(entry.flag===1&&entry.val.s<=al)return entry.val;
+    if(entry.flag===2&&entry.val.s>=bt)return entry.val;
+  }
   if(d<=0)return{s:qsh(b,al,bt,mx,c2)};
   var col=mx?'w':'b',inCheck=iCk(b,col),mvs=aLeg(b,col,c2,eps);
-  if(!mvs.length){if(inCheck)return{s:mx?-99999-d*100:99999+d*100};return{s:0}}
+  if(!mvs.length){if(inCheck)return{s:mx?-100000+MT_searchPly:100000-MT_searchPly};return{s:0}}
   if(inCheck && d < 8) d++;
   for(var i=0;i<mvs.length;i++){if(mvs[i].pro)mvs[i]={fr:mvs[i].fr,fc:mvs[i].fc,tr:mvs[i].tr,tc:mvs[i].tc,cap:mvs[i].cap,pro:false,pp:col==='w'?'Q':'q',cas:mvs[i].cas,epc:mvs[i].epc,epp:mvs[i].epp}}
   ordMT(b,mvs,d);
@@ -1557,21 +1562,7 @@ function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
       if(nullS.s>=bt)return {s:bt};
     }
     var mE=-1e9;
-    var staticEval = (d <= 2) ? ev(b,c2) : 0;
-    var futilityMargin = d === 1 ? 150 : 300;
     for(i=0;i<mvs.length;i++){
-      if(d <= 2 && i > 0 && !iCk(b,'w')){
-        if(staticEval + futilityMargin <= al){
-          if(!mvs[i].cap && !mvs[i].pp && !mvs[i].pro){
-            appM(b,mvs[i]);
-            var givesCheck = iCk(b,'b');
-            undMv(b,mvs[i]);
-            if(!givesCheck){
-              continue; // Futility Pruned
-            }
-          }
-        }
-      }
       appM(b,mvs[i]);
       var nc={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc,mvs[i]);
@@ -1614,7 +1605,10 @@ function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
       }
     }
     var res={s:mE,move:best};
-    MT_TT[h]={depth:d,val:res,move:best};
+    var flag = 0;
+    if(res.s <= origAlpha) flag = 1;
+    else if(res.s >= origBeta) flag = 2;
+    MT_TT[h]={depth:d,val:res,move:best,flag:flag};
     return res;
   }else{
     if(d>=3 && nmpOk!==false && !iCk(b,'b') && hasMat(b,'b')){
@@ -1622,21 +1616,7 @@ function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
       if(nullS2.s<=al)return {s:al};
     }
     var mE2=1e9;
-    var staticEval = (d <= 2) ? ev(b,c2) : 0;
-    var futilityMargin = d === 1 ? 150 : 300;
     for(i=0;i<mvs.length;i++){
-      if(d <= 2 && i > 0 && !iCk(b,'b')){
-        if(staticEval - futilityMargin >= bt){
-          if(!mvs[i].cap && !mvs[i].pp && !mvs[i].pro){
-            appM(b,mvs[i]);
-            var givesCheck = iCk(b,'w');
-            undMv(b,mvs[i]);
-            if(!givesCheck){
-              continue; // Futility Pruned
-            }
-          }
-        }
-      }
       appM(b,mvs[i]);
       var nc2={wk:sc.wk,wq:sc.wq,bk:sc.bk,bq:sc.bq};
       uCRc(nc2,mvs[i]);
@@ -1679,12 +1659,15 @@ function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
       }
     }
     var res2={s:mE2,move:best};
-    MT_TT[h]={depth:d,val:res2,move:best};
+    var flag = 0;
+    if(res2.s <= origAlpha) flag = 1;
+    else if(res2.s >= origBeta) flag = 2;
+    MT_TT[h]={depth:d,val:res2,move:best,flag:flag};
     return res2;
   }
 }
 
-function anaP(bB,crB,epB,mv){try{var mx=PC==='w',d=3;MT_TT={};MT_killerMoves={};for(var i=0;i<4096;i++)MT_historyTable[i]=0;var bst=mmx(cln(bB),d,-1e9,1e9,mx,{wk:crB.wk,wq:crB.wq,bk:crB.bk,bq:crB.bq},epB);var bS=bst.s;var tb=cln(bB);var tm={fr:mv.fr,fc:mv.fc,tr:mv.tr,tc:mv.tc,cap:mv.cap,cas:mv.cas,epc:mv.epc,epp:mv.epp,pp:mv.pp};appM(tb,tm);var nc={wk:crB.wk,wq:crB.wq,bk:crB.bk,bq:crB.bq};uCRc(nc,tm);var aft=mmx(cln(tb),Math.max(1,d-1),-1e9,1e9,!mx,nc,tm.epc||E);var pS=aft.s;var dd=Math.max(0,mx?(bS-pS):(pS-bS));var ac=Math.max(0,Math.min(100,Math.round(100-dd*0.25)));var pc=bB[mv.fr][mv.fc],pN=PF[ty(pc)]||'',ds=s2a(mv.tr,mv.tc);var rs=[],txt='';if(ac>=95){txt='✨عالی!';rs.push('بهترین حرکت')}else if(ac>=80){txt='👍خوب!';rs.push('حرکت قوی')}else if(ac>=60){txt='👌قابل قبول';rs.push('بد نیست')}else if(ac>=40){txt='⚠️ضعیف';rs.push('حرکت ضعیف')}else{txt='❌اشتباه!';rs.push('اشتباه جدی')}if(mv.cap)rs.push('گرفتن '+PF[ty(mv.cap)]);if(mv.cas)rs.push('قلعه');if(ac<80&&bst.move){var bp=bB[bst.move.fr][bst.move.fc];if(bp)rs.push('بهتر: '+PF[ty(bp)]+'→'+s2a(bst.move.tr,bst.move.tc))}txt+=' '+pN+'→'+ds+' ('+ac+'%) — '+rs.join('، ');return{t:txt,a:ac}}catch(e){return{t:'تحلیل ناموفق',a:50}}}
+function anaP(bB,crB,epB,mv){try{var mx=PC==='w',d=3;MT_TT={};MT_searchPly=0;MT_killerMoves={};for(var i=0;i<4096;i++)MT_historyTable[i]=0;var bst=mmx(cln(bB),d,-1e9,1e9,mx,{wk:crB.wk,wq:crB.wq,bk:crB.bk,bq:crB.bq},epB);var bS=bst.s;var tb=cln(bB);var tm={fr:mv.fr,fc:mv.fc,tr:mv.tr,tc:mv.tc,cap:mv.cap,cas:mv.cas,epc:mv.epc,epp:mv.epp,pp:mv.pp};appM(tb,tm);var nc={wk:crB.wk,wq:crB.wq,bk:crB.bk,bq:crB.bq};uCRc(nc,tm);var aft=mmx(cln(tb),Math.max(1,d-1),-1e9,1e9,!mx,nc,tm.epc||E);var pS=aft.s;var dd=Math.max(0,mx?(bS-pS):(pS-bS));var ac=Math.max(0,Math.min(100,Math.round(100-dd*0.25)));var pc=bB[mv.fr][mv.fc],pN=PF[ty(pc)]||'',ds=s2a(mv.tr,mv.tc);var rs=[],txt='';if(ac>=95){txt='✨عالی!';rs.push('بهترین حرکت')}else if(ac>=80){txt='👍خوب!';rs.push('حرکت قوی')}else if(ac>=60){txt='👌قابل قبول';rs.push('بد نیست')}else if(ac>=40){txt='⚠️ضعیف';rs.push('حرکت ضعیف')}else{txt='❌اشتباه!';rs.push('اشتباه جدی')}if(mv.cap)rs.push('گرفتن '+PF[ty(mv.cap)]);if(mv.cas)rs.push('قلعه');if(ac<80&&bst.move){var bp=bB[bst.move.fr][bst.move.fc];if(bp)rs.push('بهتر: '+PF[ty(bp)]+'→'+s2a(bst.move.tr,bst.move.tc))}txt+=' '+pN+'→'+ds+' ('+ac+'%) — '+rs.join('، ');return{t:txt,a:ac}}catch(e){return{t:'تحلیل ناموفق',a:50}}}
 
 function explAI(bB,mv,aiC,isB){var rs=[],pc=bB[mv.fr][mv.fc],pN=PF[ty(pc)]||'',ds=s2a(mv.tr,mv.tc);if(isB)rs.push('کتابی'+(oNm?' ('+oNm+')':''));if(mv.cas){rs.push('قلعه');return'🤖 '+rs.join('، ')}if(mv.cap)rs.push('گرفتن '+PF[ty(mv.cap)]);if(mv.pp)rs.push('ارتقاء');var tb=cln(bB);var tm={fr:mv.fr,fc:mv.fc,tr:mv.tr,tc:mv.tc,cap:mv.cap,cas:mv.cas,epc:mv.epc,epp:mv.epp,pp:mv.pp};appM(tb,tm);if(iCk(tb,aiC==='w'?'b':'w'))rs.push('کیش!');var bk=aiC==='w'?7:0;if(mv.fr===bk&&(ty(pc)==='N'||ty(pc)==='B'))rs.push('توسعه '+pN);if((mv.tr===3||mv.tr===4)&&(mv.tc===3||mv.tc===4))rs.push('کنترل مرکز');if(!rs.length)rs.push('بهبود موقعیت');return'🤖 '+pN+'→'+ds+' — '+rs.join('، ')}
 
