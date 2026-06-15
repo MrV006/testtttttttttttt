@@ -443,6 +443,90 @@ function ev(b, c2){
   }
   s -= Math.round((wShieldPenalty * phase) / 24);
   s += Math.round((bShieldPenalty * phase) / 24);
+
+  // King's open files penalty (150 centipawns if castled and file with opponent rook/queen is open/half-open)
+  var wOpenKingFilePenalty = 0;
+  if (wK[0] !== -1) {
+    var wCastledTemp = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
+    if (wCastledTemp) {
+      var kc = wK[1];
+      for (var f = Math.max(0, kc - 1); f <= Math.min(7, kc + 1); f++) {
+        if (wP[f] === 0) {
+          var oppOnFile = false;
+          for (var r2 = 0; r2 < 8; r2++) {
+            if (b[r2][f] === 'r' || b[r2][f] === 'q') {
+              oppOnFile = true;
+              break;
+            }
+          }
+          if (oppOnFile) {
+            wOpenKingFilePenalty += 150;
+          }
+        }
+      }
+    }
+  }
+  var bOpenKingFilePenalty = 0;
+  if (bK[0] !== -1) {
+    var bCastledTemp = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
+    if (bCastledTemp) {
+      var kc = bK[1];
+      for (var f = Math.max(0, kc - 1); f <= Math.min(7, kc + 1); f++) {
+        if (bP[f] === 0) {
+          var oppOnFile = false;
+          for (var r2 = 0; r2 < 8; r2++) {
+            if (b[r2][f] === 'R' || b[r2][f] === 'Q') {
+              oppOnFile = true;
+              break;
+            }
+          }
+          if (oppOnFile) {
+            bOpenKingFilePenalty += 150;
+          }
+        }
+      }
+    }
+  }
+  s -= wOpenKingFilePenalty;
+  s += bOpenKingFilePenalty;
+
+  // Wedge Pawn Penalty (250 centipawns if opponent pawn is within Chebyshev distance <= 2 to castled king)
+  var wWedgePenalty = 0;
+  if (wK[0] !== -1) {
+    var wCastledTemp = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
+    if (wCastledTemp) {
+      for (var r = 0; r < 8; r++) {
+        for (var c = 0; c < 8; c++) {
+          if (b[r][c] === 'p') {
+            var rowDiff = Math.abs(r - wK[0]);
+            var colDiff = Math.abs(c - wK[1]);
+            if (rowDiff <= 2 && colDiff <= 2) {
+              wWedgePenalty += 250;
+            }
+          }
+        }
+      }
+    }
+  }
+  var bWedgePenalty = 0;
+  if (bK[0] !== -1) {
+    var bCastledTemp = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
+    if (bCastledTemp) {
+      for (var r = 0; r < 8; r++) {
+        for (var c = 0; c < 8; c++) {
+          if (b[r][c] === 'P') {
+            var rowDiff = Math.abs(r - bK[0]);
+            var colDiff = Math.abs(c - bK[1]);
+            if (rowDiff <= 2 && colDiff <= 2) {
+              bWedgePenalty += 250;
+            }
+          }
+        }
+      }
+    }
+  }
+  s -= wWedgePenalty;
+  s += bWedgePenalty;
   
   if (c2) {
     var wCastled = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
@@ -656,16 +740,20 @@ function ord(b,mvs,d){
     return sz-sa;
   });
 }
-function qsh(b,al,bt,mx,c2){
+function qsh(b,al,bt,mx,c2,qdepth,checksCount){
+qdepth = qdepth || 0;
 var col=mx?'w':'b';
 var inCheck=iCk(b,col);
+checksCount = checksCount || (inCheck ? 1 : 0);
 if(inCheck){
+if(qdepth > 10) return ev(b,c2);
+var nextChecks = checksCount + 1;
 var mvs=aLeg(b,col,{wk:0,wq:0,bk:0,bq:0},E);
 if(!mvs.length)return mx?-99000:99000;
 if(mx){
 ord(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2,qdepth+1,nextChecks);undMv(b,mvs[i]);
 if(s>=bt)return bt;
 if(s>al)al=s;
 }
@@ -673,7 +761,7 @@ return al;
 }else{
 ord(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2,qdepth+1,nextChecks);undMv(b,mvs[i]);
 if(s<=al)return al;
 if(s<bt)bt=s;
 }
@@ -684,10 +772,17 @@ var val=ev(b,c2);
 if(mx){
 if(val>=bt)return val;
 if(val>al)al=val;
-var mvs=aLeg(b,'w',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
+var mvs=aLeg(b,'w',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){
+if(m.cap)return true;
+if(qdepth < 3 && checksCount > 0){
+appM(b,m);var gc=iCk(b,'b');undMv(b,m);
+return gc;
+}
+return false;
+});
 ord(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2,qdepth+1,checksCount);undMv(b,mvs[i]);
 if(s>=bt)return bt;
 if(s>al)al=s;
 }
@@ -695,10 +790,17 @@ return al;
 }else{
 if(val<=al)return val;
 if(val<bt)bt=val;
-var mvs=aLeg(b,'b',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
+var mvs=aLeg(b,'b',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){
+if(m.cap)return true;
+if(qdepth < 3 && checksCount > 0){
+appM(b,m);var gc=iCk(b,'w');undMv(b,m);
+return gc;
+}
+return false;
+});
 ord(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2,qdepth+1,checksCount);undMv(b,mvs[i]);
 if(s<=al)return al;
 if(s<bt)bt=s;
 }
@@ -1229,6 +1331,90 @@ function ev(b, c2){
   }
   s -= Math.round((wShieldPenalty * phase) / 24);
   s += Math.round((bShieldPenalty * phase) / 24);
+
+  // King's open files penalty (150 centipawns if castled and file with opponent rook/queen is open/half-open)
+  var wOpenKingFilePenalty = 0;
+  if (wK[0] !== -1) {
+    var wCastledTemp = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
+    if (wCastledTemp) {
+      var kc = wK[1];
+      for (var f = Math.max(0, kc - 1); f <= Math.min(7, kc + 1); f++) {
+        if (wP[f] === 0) {
+          var oppOnFile = false;
+          for (var r2 = 0; r2 < 8; r2++) {
+            if (b[r2][f] === 'r' || b[r2][f] === 'q') {
+              oppOnFile = true;
+              break;
+            }
+          }
+          if (oppOnFile) {
+            wOpenKingFilePenalty += 150;
+          }
+        }
+      }
+    }
+  }
+  var bOpenKingFilePenalty = 0;
+  if (bK[0] !== -1) {
+    var bCastledTemp = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
+    if (bCastledTemp) {
+      var kc = bK[1];
+      for (var f = Math.max(0, kc - 1); f <= Math.min(7, kc + 1); f++) {
+        if (bP[f] === 0) {
+          var oppOnFile = false;
+          for (var r2 = 0; r2 < 8; r2++) {
+            if (b[r2][f] === 'R' || b[r2][f] === 'Q') {
+              oppOnFile = true;
+              break;
+            }
+          }
+          if (oppOnFile) {
+            bOpenKingFilePenalty += 150;
+          }
+        }
+      }
+    }
+  }
+  s -= wOpenKingFilePenalty;
+  s += bOpenKingFilePenalty;
+
+  // Wedge Pawn Penalty (250 centipawns if opponent pawn is within Chebyshev distance <= 2 to castled king)
+  var wWedgePenalty = 0;
+  if (wK[0] !== -1) {
+    var wCastledTemp = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
+    if (wCastledTemp) {
+      for (var r = 0; r < 8; r++) {
+        for (var c = 0; c < 8; c++) {
+          if (b[r][c] === 'p') {
+            var rowDiff = Math.abs(r - wK[0]);
+            var colDiff = Math.abs(c - wK[1]);
+            if (rowDiff <= 2 && colDiff <= 2) {
+              wWedgePenalty += 250;
+            }
+          }
+        }
+      }
+    }
+  }
+  var bWedgePenalty = 0;
+  if (bK[0] !== -1) {
+    var bCastledTemp = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
+    if (bCastledTemp) {
+      for (var r = 0; r < 8; r++) {
+        for (var c = 0; c < 8; c++) {
+          if (b[r][c] === 'P') {
+            var rowDiff = Math.abs(r - bK[0]);
+            var colDiff = Math.abs(c - bK[1]);
+            if (rowDiff <= 2 && colDiff <= 2) {
+              bWedgePenalty += 250;
+            }
+          }
+        }
+      }
+    }
+  }
+  s -= wWedgePenalty;
+  s += bWedgePenalty;
   
   if (c2) {
     var wCastled = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
@@ -1450,16 +1636,20 @@ function ordMT(b,mvs,d){
     return sz-sa;
   });
 }
-function qsh(b,al,bt,mx,c2){
+function qsh(b,al,bt,mx,c2,qdepth,checksCount){
+qdepth = qdepth || 0;
 var col=mx?'w':'b';
 var inCheck=iCk(b,col);
+checksCount = checksCount || (inCheck ? 1 : 0);
 if(inCheck){
+if(qdepth > 10) return ev(b,c2);
+var nextChecks = checksCount + 1;
 var mvs=aLeg(b,col,{wk:0,wq:0,bk:0,bq:0},E);
 if(!mvs.length)return mx?-99000:99000;
 if(mx){
 ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2,qdepth+1,nextChecks);undMv(b,mvs[i]);
 if(s>=bt)return bt;
 if(s>al)al=s;
 }
@@ -1467,7 +1657,7 @@ return al;
 }else{
 ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2,qdepth+1,nextChecks);undMv(b,mvs[i]);
 if(s<=al)return al;
 if(s<bt)bt=s;
 }
@@ -1478,10 +1668,17 @@ var val=ev(b,c2);
 if(mx){
 if(val>=bt)return val;
 if(val>al)al=val;
-var mvs=aLeg(b,'w',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
+var mvs=aLeg(b,'w',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){
+if(m.cap)return true;
+if(qdepth < 3 && checksCount > 0){
+appM(b,m);var gc=iCk(b,'b');undMv(b,m);
+return gc;
+}
+return false;
+});
 ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2,qdepth+1,checksCount);undMv(b,mvs[i]);
 if(s>=bt)return bt;
 if(s>al)al=s;
 }
@@ -1489,10 +1686,17 @@ return al;
 }else{
 if(val<=al)return val;
 if(val<bt)bt=val;
-var mvs=aLeg(b,'b',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){return m.cap});
+var mvs=aLeg(b,'b',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){
+if(m.cap)return true;
+if(qdepth < 3 && checksCount > 0){
+appM(b,m);var gc=iCk(b,'w');undMv(b,m);
+return gc;
+}
+return false;
+});
 ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
-appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2);undMv(b,mvs[i]);
+appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2,qdepth+1,checksCount);undMv(b,mvs[i]);
 if(s<=al)return al;
 if(s<bt)bt=s;
 }
