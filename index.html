@@ -338,18 +338,31 @@ function ev(b, c2){ // WK_EV_FUNC
   var phaseWeight = { 'N': 1, 'B': 1, 'R': 2, 'Q': 4 };
   var totalPhase = 0;
   
+  var wQPos=[-1,-1], bQPos=[-1,-1];
   for (var i=0; i<8; i++){
     for (var j=0; j<8; j++){
       var p=b[i][j];
       if(!p) continue;
-      var t2=ty(p);
+      var t2=ty(p), c=co(p);
       if(phaseWeight[t2] !== undefined){
         totalPhase += phaseWeight[t2];
+      }
+      if(t2==='P'){
+        if(c==='w') wP[j]++; else bP[j]++;
+      } else if(t2==='K'){
+        if(c==='w') wK=[i,j]; else bK=[i,j];
+      } else if(t2==='Q'){
+        if(c==='w') wQPos=[i,j]; else bQPos=[i,j];
       }
     }
   }
   var phase = Math.min(24, totalPhase);
   
+  if (phase > 15) {
+    if (b[6][4] === 'Q' && b[7][5] === 'B') s -= 35;
+    if (b[1][4] === 'q' && b[0][5] === 'b') s += 35;
+  }
+
   for (var i=0; i<8; i++){
     for (var j=0; j<8; j++){
       var p=b[i][j];
@@ -369,18 +382,167 @@ function ev(b, c2){ // WK_EV_FUNC
       
       s += (c==='w'?1:-1)*(v+ps);
  
-      // Hanging/Loose piece penalty (excluding King and Pawns)
-      if (t2 !== 'K' && t2 !== 'P') {
-        if (!sAt(b, i, j, c)) {
-          s += (c === 'w' ? -20 : 20);
-          var by = c === 'w' ? 'b' : 'w';
-          if (sAt(b, i, j, by)) {
-            if (c === 'w') {
-              wHangingAttacked++;
-            } else {
-              bHangingAttacked++;
+      // Wing pawn push penalty in opening
+      if (phase > 12 && t2 === 'P') {
+        if (j === 0 || j === 7) {
+          if (c === 'w') {
+            var wKUncastled = (wK[0] === 7 && wK[1] === 4);
+            if (i <= 4 && wKUncastled) {
+              s -= 25;
+            }
+          } else {
+            var bKUncastled = (bK[0] === 0 && bK[1] === 4);
+            if (i >= 3 && bKUncastled) {
+              s += 25;
             }
           }
+        }
+      }
+
+      // Tactical vulnerability and blunder safety penalty
+      if (t2 !== 'K') {
+        var isDefended = sAt(b, i, j, c);
+        var by = c === 'w' ? 'b' : 'w';
+        var isAttacked = sAt(b, i, j, by);
+        
+        // Pinned piece evaluation
+        var myKingPos = c === 'w' ? wK : bK;
+        var myQueenPos = c === 'w' ? wQPos : bQPos;
+        var isPinned = false;
+        var pinLevel = 0; // 1 = Queen, 2 = King
+        var origPiece = b[i][j];
+        b[i][j] = E;
+        
+        // King pin check
+        if (myKingPos[0] !== -1) {
+          var kp = myKingPos;
+          var sl_dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+          for (var k_dir=0; k_dir<4; k_dir++) {
+            var nr = kp[0]+sl_dirs[k_dir][0], nc = kp[1]+sl_dirs[k_dir][1];
+            while (ib(nr, nc)) {
+              var oppP = b[nr][nc];
+              if (oppP) {
+                if (co(oppP) === by && (ty(oppP)==='R'||ty(oppP)==='Q')) {
+                  isPinned = true;
+                  pinLevel = 2;
+                }
+                break;
+              }
+              nr += sl_dirs[k_dir][0]; nc += sl_dirs[k_dir][1];
+            }
+            if (isPinned) break;
+          }
+          if (!isPinned) {
+            var dg_dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+            for (var k_dir=0; k_dir<4; k_dir++) {
+              var nr = kp[0]+dg_dirs[k_dir][0], nc = kp[1]+dg_dirs[k_dir][1];
+              while (ib(nr, nc)) {
+                var oppP = b[nr][nc];
+                if (oppP) {
+                  if (co(oppP) === by && (ty(oppP)==='B'||ty(oppP)==='Q')) {
+                    isPinned = true;
+                    pinLevel = 2;
+                  }
+                  break;
+                }
+                nr += dg_dirs[k_dir][0]; nc += dg_dirs[k_dir][1];
+              }
+              if (isPinned) break;
+            }
+          }
+        }
+        
+        // Queen pin check
+        if (!isPinned && myQueenPos[0] !== -1) {
+          var qp = myQueenPos;
+          var sl_dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+          for (var k_dir=0; k_dir<4; k_dir++) {
+            var nr = qp[0]+sl_dirs[k_dir][0], nc = qp[1]+sl_dirs[k_dir][1];
+            while (ib(nr, nc)) {
+              var oppP = b[nr][nc];
+              if (oppP) {
+                if (co(oppP) === by && (ty(oppP)==='R'||ty(oppP)==='Q')) {
+                  isPinned = true;
+                  pinLevel = 1;
+                }
+                break;
+              }
+              nr += sl_dirs[k_dir][0]; nc += sl_dirs[k_dir][1];
+            }
+            if (isPinned) break;
+          }
+          if (!isPinned) {
+            var dg_dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+            for (var k_dir=0; k_dir<4; k_dir++) {
+              var nr = qp[0]+dg_dirs[k_dir][0], nc = qp[1]+dg_dirs[k_dir][1];
+              while (ib(nr, nc)) {
+                var oppP = b[nr][nc];
+                if (oppP) {
+                  if (co(oppP) === by && (ty(oppP)==='B'||ty(oppP)==='Q')) {
+                    isPinned = true;
+                    pinLevel = 1;
+                  }
+                  break;
+                }
+                nr += dg_dirs[k_dir][0]; nc += dg_dirs[k_dir][1];
+              }
+              if (isPinned) break;
+            }
+          }
+        }
+        b[i][j] = origPiece;
+        
+        if (isPinned) {
+          var pinPen = (pinLevel === 2) ? 40 : 20;
+          s += (c === 'w' ? -pinPen : pinPen);
+          
+          var hasPawnThreat = false;
+          var pd = c === 'w' ? -1 : 1;
+          for (var dc = -1; dc <= 1; dc += 2) {
+            var pr = i + pd, pc = j + dc;
+            if (pr >= 0 && pr < 8 && pc >= 0 && pc < 8) {
+              var oppP = b[pr][pc];
+              if (oppP && co(oppP) === by && ty(oppP) === 'P') {
+                hasPawnThreat = true;
+              }
+            }
+          }
+          if (isAttacked || hasPawnThreat) {
+            s += (c === 'w' ? -130 : 130);
+          }
+        }
+
+        if (isAttacked) {
+          if (!isDefended) {
+            var blunderPenalty = 50;
+            if (t2 === 'N' || t2 === 'B') blunderPenalty = 180;
+            else if (t2 === 'R') blunderPenalty = 300;
+            else if (t2 === 'Q') blunderPenalty = 600;
+            s += (c === 'w' ? -blunderPenalty : blunderPenalty);
+            if (c === 'w') wHangingAttacked++; else bHangingAttacked++;
+          } else {
+            var attackedByPawn = false;
+            var pd = c === 'w' ? -1 : 1;
+            for (var dc = -1; dc <= 1; dc += 2) {
+              var pr = i + pd, pc = j + dc;
+              if (pr >= 0 && pr < 8 && pc >= 0 && pc < 8) {
+                var oppP = b[pr][pc];
+                if (oppP && co(oppP) === by && ty(oppP) === 'P') {
+                  attackedByPawn = true;
+                }
+              }
+            }
+            if (attackedByPawn && t2 !== 'P') {
+              s += (c === 'w' ? -150 : 150);
+            } else {
+              var leastAttacker = getLeastValuableAttacker(b, i, j, by);
+              if (leastAttacker && leastAttacker.val < v) {
+                s += (c === 'w' ? -100 : 100);
+              }
+            }
+          }
+        } else if (!isDefended && t2 !== 'P') {
+          s += (c === 'w' ? -15 : 15);
         }
       }
       
@@ -399,9 +561,9 @@ function ev(b, c2){ // WK_EV_FUNC
           if (i === 6 || i === 7) { s -= 20; }
         }
       } else if(t2==='P'){
-        if(c==='w') wP[j]++; else bP[j]++;
+        // Handled in preamble
       } else if(t2==='K'){
-        if(c==='w') wK=[i,j]; else bK=[i,j];
+        // Handled in preamble
       } else if(t2==='Q'){
         if(c==='w') { wQ++; wHasQueen=true; } else { bQ++; bHasQueen=true; }
         // Defensive Queen Behind Pawns in Opening
@@ -1229,7 +1391,8 @@ self.onmessage=function(e){
       bestResult = res;
       
       var elapsed = Date.now() - globalStartTime;
-      if(elapsed > globalTimeLimit * 0.40){
+      var threshold = globalTimeLimit * (maxDepth >= 8 ? 0.45 : 0.40);
+      if(elapsed > threshold){
         break;
       }
     }
@@ -1417,18 +1580,31 @@ function ev(b, c2){
   var phaseWeight = { 'N': 1, 'B': 1, 'R': 2, 'Q': 4 };
   var totalPhase = 0;
   
+  var wQPos=[-1,-1], bQPos=[-1,-1];
   for (var i=0; i<8; i++){
     for (var j=0; j<8; j++){
       var p=b[i][j];
       if(!p) continue;
-      var t2=ty(p);
+      var t2=ty(p), c=co(p);
       if(phaseWeight[t2] !== undefined){
         totalPhase += phaseWeight[t2];
+      }
+      if(t2==='P'){
+        if(c==='w') wP[j]++; else bP[j]++;
+      } else if(t2==='K'){
+        if(c==='w') wK=[i,j]; else bK=[i,j];
+      } else if(t2==='Q'){
+        if(c==='w') wQPos=[i,j]; else bQPos=[i,j];
       }
     }
   }
   var phase = Math.min(24, totalPhase);
   
+  if (phase > 15) {
+    if (b[6][4] === 'Q' && b[7][5] === 'B') s -= 35;
+    if (b[1][4] === 'q' && b[0][5] === 'b') s += 35;
+  }
+
   for (var i=0; i<8; i++){
     for (var j=0; j<8; j++){
       var p=b[i][j];
@@ -1448,18 +1624,167 @@ function ev(b, c2){
       
       s += (c==='w'?1:-1)*(v+ps);
  
-      // Hanging/Loose piece penalty (excluding King and Pawns)
-      if (t2 !== 'K' && t2 !== 'P') {
-        if (!sAt(b, i, j, c)) {
-          s += (c === 'w' ? -20 : 20);
-          var by = c === 'w' ? 'b' : 'w';
-          if (sAt(b, i, j, by)) {
-            if (c === 'w') {
-              wHangingAttacked++;
-            } else {
-              bHangingAttacked++;
+      // Wing pawn push penalty in opening
+      if (phase > 12 && t2 === 'P') {
+        if (j === 0 || j === 7) {
+          if (c === 'w') {
+            var wKUncastled = (wK[0] === 7 && wK[1] === 4);
+            if (i <= 4 && wKUncastled) {
+              s -= 25;
+            }
+          } else {
+            var bKUncastled = (bK[0] === 0 && bK[1] === 4);
+            if (i >= 3 && bKUncastled) {
+              s += 25;
             }
           }
+        }
+      }
+
+      // Tactical vulnerability and blunder safety penalty
+      if (t2 !== 'K') {
+        var isDefended = sAt(b, i, j, c);
+        var by = c === 'w' ? 'b' : 'w';
+        var isAttacked = sAt(b, i, j, by);
+        
+        // Pinned piece evaluation
+        var myKingPos = c === 'w' ? wK : bK;
+        var myQueenPos = c === 'w' ? wQPos : bQPos;
+        var isPinned = false;
+        var pinLevel = 0; // 1 = Queen, 2 = King
+        var origPiece = b[i][j];
+        b[i][j] = E;
+        
+        // King pin check
+        if (myKingPos[0] !== -1) {
+          var kp = myKingPos;
+          var sl_dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+          for (var k_dir=0; k_dir<4; k_dir++) {
+            var nr = kp[0]+sl_dirs[k_dir][0], nc = kp[1]+sl_dirs[k_dir][1];
+            while (ib(nr, nc)) {
+              var oppP = b[nr][nc];
+              if (oppP) {
+                if (co(oppP) === by && (ty(oppP)==='R'||ty(oppP)==='Q')) {
+                  isPinned = true;
+                  pinLevel = 2;
+                }
+                break;
+              }
+              nr += sl_dirs[k_dir][0]; nc += sl_dirs[k_dir][1];
+            }
+            if (isPinned) break;
+          }
+          if (!isPinned) {
+            var dg_dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+            for (var k_dir=0; k_dir<4; k_dir++) {
+              var nr = kp[0]+dg_dirs[k_dir][0], nc = kp[1]+dg_dirs[k_dir][1];
+              while (ib(nr, nc)) {
+                var oppP = b[nr][nc];
+                if (oppP) {
+                  if (co(oppP) === by && (ty(oppP)==='B'||ty(oppP)==='Q')) {
+                    isPinned = true;
+                    pinLevel = 2;
+                  }
+                  break;
+                }
+                nr += dg_dirs[k_dir][0]; nc += dg_dirs[k_dir][1];
+              }
+              if (isPinned) break;
+            }
+          }
+        }
+        
+        // Queen pin check
+        if (!isPinned && myQueenPos[0] !== -1) {
+          var qp = myQueenPos;
+          var sl_dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+          for (var k_dir=0; k_dir<4; k_dir++) {
+            var nr = qp[0]+sl_dirs[k_dir][0], nc = qp[1]+sl_dirs[k_dir][1];
+            while (ib(nr, nc)) {
+              var oppP = b[nr][nc];
+              if (oppP) {
+                if (co(oppP) === by && (ty(oppP)==='R'||ty(oppP)==='Q')) {
+                  isPinned = true;
+                  pinLevel = 1;
+                }
+                break;
+              }
+              nr += sl_dirs[k_dir][0]; nc += sl_dirs[k_dir][1];
+            }
+            if (isPinned) break;
+          }
+          if (!isPinned) {
+            var dg_dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+            for (var k_dir=0; k_dir<4; k_dir++) {
+              var nr = qp[0]+dg_dirs[k_dir][0], nc = qp[1]+dg_dirs[k_dir][1];
+              while (ib(nr, nc)) {
+                var oppP = b[nr][nc];
+                if (oppP) {
+                  if (co(oppP) === by && (ty(oppP)==='B'||ty(oppP)==='Q')) {
+                    isPinned = true;
+                    pinLevel = 1;
+                  }
+                  break;
+                }
+                nr += dg_dirs[k_dir][0]; nc += dg_dirs[k_dir][1];
+              }
+              if (isPinned) break;
+            }
+          }
+        }
+        b[i][j] = origPiece;
+        
+        if (isPinned) {
+          var pinPen = (pinLevel === 2) ? 40 : 20;
+          s += (c === 'w' ? -pinPen : pinPen);
+          
+          var hasPawnThreat = false;
+          var pd = c === 'w' ? -1 : 1;
+          for (var dc = -1; dc <= 1; dc += 2) {
+            var pr = i + pd, pc = j + dc;
+            if (pr >= 0 && pr < 8 && pc >= 0 && pc < 8) {
+              var oppP = b[pr][pc];
+              if (oppP && co(oppP) === by && ty(oppP) === 'P') {
+                hasPawnThreat = true;
+              }
+            }
+          }
+          if (isAttacked || hasPawnThreat) {
+            s += (c === 'w' ? -130 : 130);
+          }
+        }
+
+        if (isAttacked) {
+          if (!isDefended) {
+            var blunderPenalty = 50;
+            if (t2 === 'N' || t2 === 'B') blunderPenalty = 180;
+            else if (t2 === 'R') blunderPenalty = 300;
+            else if (t2 === 'Q') blunderPenalty = 600;
+            s += (c === 'w' ? -blunderPenalty : blunderPenalty);
+            if (c === 'w') wHangingAttacked++; else bHangingAttacked++;
+          } else {
+            var attackedByPawn = false;
+            var pd = c === 'w' ? -1 : 1;
+            for (var dc = -1; dc <= 1; dc += 2) {
+              var pr = i + pd, pc = j + dc;
+              if (pr >= 0 && pr < 8 && pc >= 0 && pc < 8) {
+                var oppP = b[pr][pc];
+                if (oppP && co(oppP) === by && ty(oppP) === 'P') {
+                  attackedByPawn = true;
+                }
+              }
+            }
+            if (attackedByPawn && t2 !== 'P') {
+              s += (c === 'w' ? -150 : 150);
+            } else {
+              var leastAttacker = getLeastValuableAttacker(b, i, j, by);
+              if (leastAttacker && leastAttacker.val < v) {
+                s += (c === 'w' ? -100 : 100);
+              }
+            }
+          }
+        } else if (!isDefended && t2 !== 'P') {
+          s += (c === 'w' ? -15 : 15);
         }
       }
       
@@ -1478,9 +1803,9 @@ function ev(b, c2){
           if (i === 6 || i === 7) { s -= 20; }
         }
       } else if(t2==='P'){
-        if(c==='w') wP[j]++; else bP[j]++;
+        // Handled in preamble
       } else if(t2==='K'){
-        if(c==='w') wK=[i,j]; else bK=[i,j];
+        // Handled in preamble
       } else if(t2==='Q'){
         if(c==='w') { wQ++; wHasQueen=true; } else { bQ++; bHasQueen=true; }
         // Defensive Queen Behind Pawns in Opening
@@ -2319,13 +2644,33 @@ function aiTn(){
         if(best.pro)best={fr:best.fr,fc:best.fc,tr:best.tr,tc:best.tc,cap:best.cap,pro:false,pp:aiC==='w'?'Q':'q',cas:best.cas,epc:best.epc,epp:best.epp};
         applyAiMove(best,aiC,false);
       } else {
-        var d2=[2,3,4,5][Math.min(df-1,3)];
+        var isUnderCheck = iCk(bd, aiC);
+        var isDangerous = isUnderCheck;
+        if (!isDangerous) {
+          var currentEval = ev(bd, cas);
+          var sign = aiC === 'w' ? 1 : -1;
+          var myScore = currentEval * sign;
+          if (myScore < -150) {
+            isDangerous = true;
+          }
+        }
+
+        var d2 = [2, 3, 5, 8][Math.min(df-1, 3)];
+        var baseBudgets = [300, 1200, 2500, 15000];
+        var timeLimit = baseBudgets[Math.min(df-1, 3)];
+        
+        if (df === 4) {
+          if (isDangerous) {
+            timeLimit = 30000;
+            d2 = 9;
+          } else {
+            timeLimit = 15000;
+          }
+        }
+        
         var pcCount=0;
         for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c])pcCount++;
         if(pcCount<12)d2+=2; // Search deeper in endgame since branching factor is very low
-        
-        var baseBudgets=[300,1200,2500,5000];
-        var timeLimit=baseBudgets[Math.min(df-1,3)];
         
         terminateWorker();
         var worker=getWorker();
