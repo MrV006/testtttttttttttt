@@ -282,16 +282,18 @@ var sfx={move:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_M
 function playSound(t){if(sfx[t]){sfx[t].currentTime=0;sfx[t].play().catch(function(){})}}
 
 var workerBlobUrl=null,aiWorker=null;
-var WORKER_CODE=`var E=null;
+var WORKER_CODE=`// --- WORKER ENGINE CORE ---
+var E=null;
 var TT={};
 var searchPly=0;
-function getHash(b,mx,c2,eps){
+function getHash(b,mx,c2,eps){ // WK_HASH
   var s=mx?'w':'b';
   s+=c2.wk+''+c2.wq+''+c2.bk+''+c2.bq;
   s+=eps?(eps[0]+''+eps[1]):'-';
   for(var i=0;i<8;i++)for(var j=0;j<8;j++)s+=b[i][j]||'.';
   return s;
 }
+// WORKER_EV_MARKER
 var PV={P:100,N:320,B:330,R:500,Q:950,K:20000};
 var TBL={
 P:[[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,27,27,10,5,5],[0,0,0,25,25,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-25,-25,10,10,5],[0,0,0,0,0,0,0,0]],
@@ -325,44 +327,7 @@ function iCk(b,col){var kp=fK(b,col);return kp?sAt(b,kp[0],kp[1],col==='w'?'b':'
 function leg(b,r,c,col,c2,eps){var mvs=raw(b,r,c,col,eps);if(ty(b[r][c])==='K'){var cm=casM(b,col,c2);for(var i=0;i<cm.length;i++)mvs.push(cm[i])}var out=[];for(var j=0;j<mvs.length;j++){appM(b,mvs[j]);var ok=!iCk(b,col);undMv(b,mvs[j]);if(ok)out.push(mvs[j])}return out}
 function aLeg(b,col,c2,eps){var a=[];for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&co(b[i][j])===col){var m=leg(b,i,j,col,c2,eps);for(var k=0;k<m.length;k++)a.push(m[k])}return a}
 
-function attByKQR(b,r,c,by){
-  var i,nr,nc,p;
-  var kk=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
-  for(i=0;i<8;i++){
-    nr=r+kk[i][0];nc=c+kk[i][1];
-    if(ib(nr,nc)){
-      p=b[nr][nc];
-      if(p&&co(p)===by&&ty(p)==='K')return true;
-    }
-  }
-  var sl=[[0,1],[0,-1],[1,0],[-1,0]];
-  for(i=0;i<4;i++){
-    nr=r+sl[i][0];nc=c+sl[i][1];
-    while(ib(nr,nc)){
-      p=b[nr][nc];
-      if(p){
-        if(co(p)===by&&(ty(p)==='R'||ty(p)==='Q'))return true;
-        break;
-      }
-      nr+=sl[i][0];nc+=sl[i][1];
-    }
-  }
-  var dg=[[1,1],[1,-1],[-1,1],[-1,-1]];
-  for(i=0;i<4;i++){
-    nr=r+dg[i][0];nc=c+dg[i][1];
-    while(ib(nr,nc)){
-      p=b[nr][nc];
-      if(p){
-        if(co(p)===by&&ty(p)==='Q')return true;
-        break;
-      }
-      nr+=dg[i][0];nc+=dg[i][1];
-    }
-  }
-  return false;
-}
-
-function ev(b, c2){
+function ev(b, c2){ // WK_EV_FUNC
   var s=0;
   var wB=0, bB=0, wN=0, bN=0, wR=0, bR=0, wQ=0, bQ=0;
   var wP=[0,0,0,0,0,0,0,0], bP=[0,0,0,0,0,0,0,0];
@@ -403,13 +368,13 @@ function ev(b, c2){
       }
       
       s += (c==='w'?1:-1)*(v+ps);
-
+ 
       // Hanging/Loose piece penalty (excluding King and Pawns)
       if (t2 !== 'K' && t2 !== 'P') {
         if (!sAt(b, i, j, c)) {
           s += (c === 'w' ? -20 : 20);
           var by = c === 'w' ? 'b' : 'w';
-          if (attByKQR(b, i, j, by)) {
+          if (sAt(b, i, j, by)) {
             if (c === 'w') {
               wHangingAttacked++;
             } else {
@@ -424,7 +389,15 @@ function ev(b, c2){
       } else if(t2==='N'){
         if(c==='w') wN++; else bN++;
       } else if(t2==='R'){
-        if(c==='w') wR++; else bR++;
+        if(c==='w') {
+          wR++;
+          if (wP[j] === 0) { s += bP[j] === 0 ? 25 : 12; }
+          if (i === 1 || i === 0) { s += 20; }
+        } else {
+          bR++;
+          if (bP[j] === 0) { s -= wP[j] === 0 ? 25 : 12; }
+          if (i === 6 || i === 7) { s -= 20; }
+        }
       } else if(t2==='P'){
         if(c==='w') wP[j]++; else bP[j]++;
       } else if(t2==='K'){
@@ -480,7 +453,7 @@ function ev(b, c2){
   
   if(wB>=2) s+=30;
   if(bB>=2) s-=30;
-
+ 
   // Major-Minor Imbalance Guard (Queen vs Rook + Minor Piece)
   if (wQ > 0 && bQ === 0) {
     if (bR > 0 && (bN + bB) > 0) {
@@ -492,7 +465,7 @@ function ev(b, c2){
       s -= 180;
     }
   }
-
+ 
   // Multi-target attack penalty on hanging pieces
   if (wHangingAttacked >= 2) {
     s -= 150;
@@ -524,7 +497,17 @@ function ev(b, c2){
             }
             if(!ip) break;
           }
-          if(ip) s+=(7-i)*10;
+          if(ip) {
+            var dist = i;
+            var ppb = 0;
+            if (dist === 1) ppb = 240;
+            else if (dist === 2) ppb = 130;
+            else if (dist === 3) ppb = 65;
+            else if (dist === 4) ppb = 35;
+            else if (dist === 5) ppb = 15;
+            else if (dist === 6) ppb = 5;
+            s += ppb;
+          }
         } else {
           for(var nf=Math.max(0,j-1); nf<=Math.min(7,j+1); nf++){
             for(var nr=i+1; nr<8; nr++) {
@@ -532,7 +515,17 @@ function ev(b, c2){
             }
             if(!ip) break;
           }
-          if(ip) s-=i*10;
+          if(ip) {
+            var dist = 7 - i;
+            var ppb = 0;
+            if (dist === 1) ppb = 240;
+            else if (dist === 2) ppb = 130;
+            else if (dist === 3) ppb = 65;
+            else if (dist === 4) ppb = 35;
+            else if (dist === 5) ppb = 15;
+            else if (dist === 6) ppb = 5;
+            s -= ppb;
+          }
         }
       }
     }
@@ -543,7 +536,29 @@ function ev(b, c2){
   if(wK[0]!==-1){
     var kc=wK[1];
     for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
-      if(wP[f]===0) wShieldPenalty += bHasQueen ? 45 : 15;
+      var foundPawn = false;
+      var pawnRow = -1;
+      for (var r = 7; r >= 0; r--) {
+        if (b[r][f] === 'P') {
+          foundPawn = true;
+          pawnRow = r;
+          break;
+        }
+      }
+      var weight = (f === kc) ? 1.2 : 0.85;
+      var base = 0;
+      if (!foundPawn) {
+        base = bHasQueen ? 150 : 45;
+      } else {
+        if (pawnRow === 5) {
+          base = bHasQueen ? 45 : 20;
+        } else if (pawnRow === 4) {
+          base = bHasQueen ? 95 : 45;
+        } else if (pawnRow < 4) {
+          base = bHasQueen ? 160 : 65;
+        }
+      }
+      wShieldPenalty += base * weight;
     }
     for(var i=0; i<8; i++){
       if(b[i][kc] === 'r' || b[i][kc] === 'q'){
@@ -554,7 +569,29 @@ function ev(b, c2){
   if(bK[0]!==-1){
     var kc=bK[1];
     for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
-      if(bP[f]===0) bShieldPenalty += wHasQueen ? 45 : 15;
+      var foundPawn = false;
+      var pawnRow = -1;
+      for (var r = 0; r < 8; r++) {
+        if (b[r][f] === 'p') {
+          foundPawn = true;
+          pawnRow = r;
+          break;
+        }
+      }
+      var weight = (f === kc) ? 1.2 : 0.85;
+      var base = 0;
+      if (!foundPawn) {
+        base = wHasQueen ? 150 : 45;
+      } else {
+        if (pawnRow === 2) {
+          base = wHasQueen ? 45 : 20;
+        } else if (pawnRow === 3) {
+          base = wHasQueen ? 95 : 45;
+        } else if (pawnRow > 3) {
+          base = wHasQueen ? 160 : 65;
+        }
+      }
+      bShieldPenalty += base * weight;
     }
     for(var i=0; i<8; i++){
       if(b[i][kc] === 'R' || b[i][kc] === 'Q'){
@@ -564,15 +601,19 @@ function ev(b, c2){
   }
   s -= Math.round((wShieldPenalty * phase) / 24);
   s += Math.round((bShieldPenalty * phase) / 24);
-
-  // King's open files penalty (150 centipawns if castled and file with opponent rook/queen is open/half-open)
+ 
+  // King's open files penalty (120 centipawns if castled and file with opponent rook/queen is open/half-open)
   var wOpenKingFilePenalty = 0;
   if (wK[0] !== -1) {
-    var wCastledTemp = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
+    var wCastledTemp = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2)) || (phase > 8);
     if (wCastledTemp) {
       var kc = wK[1];
       for (var f = Math.max(0, kc - 1); f <= Math.min(7, kc + 1); f++) {
-        if (wP[f] === 0) {
+        var hasFriendlyPawn = false;
+        for (var r = 0; r < 8; r++) {
+          if (b[r][f] === 'P') { hasFriendlyPawn = true; break; }
+        }
+        if (!hasFriendlyPawn) {
           var oppOnFile = false;
           for (var r2 = 0; r2 < 8; r2++) {
             if (b[r2][f] === 'r' || b[r2][f] === 'q') {
@@ -581,7 +622,7 @@ function ev(b, c2){
             }
           }
           if (oppOnFile) {
-            wOpenKingFilePenalty += 150;
+            wOpenKingFilePenalty += 120;
           }
         }
       }
@@ -589,11 +630,15 @@ function ev(b, c2){
   }
   var bOpenKingFilePenalty = 0;
   if (bK[0] !== -1) {
-    var bCastledTemp = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
+    var bCastledTemp = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2)) || (phase > 8);
     if (bCastledTemp) {
       var kc = bK[1];
       for (var f = Math.max(0, kc - 1); f <= Math.min(7, kc + 1); f++) {
-        if (bP[f] === 0) {
+        var hasFriendlyPawn = false;
+        for (var r = 0; r < 8; r++) {
+          if (b[r][f] === 'p') { hasFriendlyPawn = true; break; }
+        }
+        if (!hasFriendlyPawn) {
           var oppOnFile = false;
           for (var r2 = 0; r2 < 8; r2++) {
             if (b[r2][f] === 'R' || b[r2][f] === 'Q') {
@@ -602,15 +647,15 @@ function ev(b, c2){
             }
           }
           if (oppOnFile) {
-            bOpenKingFilePenalty += 150;
+            bOpenKingFilePenalty += 120;
           }
         }
       }
     }
   }
-  s -= wOpenKingFilePenalty;
-  s += bOpenKingFilePenalty;
-
+  s -= Math.round((wOpenKingFilePenalty * phase) / 24);
+  s += Math.round((bOpenKingFilePenalty * phase) / 24);
+ 
   // Wedge Pawn Penalty (250 centipawns if opponent pawn is within Chebyshev distance <= 2 to castled king)
   var wWedgePenalty = 0;
   if (wK[0] !== -1) {
@@ -653,20 +698,37 @@ function ev(b, c2){
     var wCastled = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
     if (!wCastled) {
       if (!c2.wk && !c2.wq) {
-        s -= 250;
+        s -= 65;
       } else {
-        if (!c2.wk) s -= 75;
-        if (!c2.wq) s -= 75;
+        if (!c2.wk) s -= 20;
+        if (!c2.wq) s -= 20;
       }
     }
     var bCastled = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
     if (!bCastled) {
       if (!c2.bk && !c2.bq) {
-        s += 250;
+        s += 65;
       } else {
-        if (!c2.bk) s += 75;
-        if (!c2.bq) s += 75;
+        if (!c2.bk) s += 20;
+        if (!c2.bq) s += 20;
       }
+    }
+  }
+  
+  // Minor piece vs Pawns trade adjustment
+  var wMinors = wB + wN;
+  var bMinors = bB + bN;
+  var wPawnCount = 0, bPawnCount = 0;
+  for (var f = 0; f < 8; f++) {
+    wPawnCount += wP[f];
+    bPawnCount += bP[f];
+  }
+  if (phase > 8) {
+    if (wMinors < bMinors && wPawnCount > bPawnCount) {
+      s -= 110;
+    }
+    if (bMinors < wMinors && bPawnCount > wPawnCount) {
+      s += 110;
     }
   }
   
@@ -1344,43 +1406,6 @@ function iCk(b,col){var kp=fK(b,col);return kp?sAt(b,kp[0],kp[1],col==='w'?'b':'
 function leg(b,r,c,col,c2,eps){var mvs=raw(b,r,c,col,eps);if(ty(b[r][c])==='K'){var cm=casM(b,col,c2);for(var i=0;i<cm.length;i++)mvs.push(cm[i])}var out=[];for(var j=0;j<mvs.length;j++){appM(b,mvs[j]);var ok=!iCk(b,col);undMv(b,mvs[j]);if(ok)out.push(mvs[j])}return out}
 function aLeg(b,col,c2,eps){var a=[];for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&co(b[i][j])===col){var m=leg(b,i,j,col,c2,eps);for(var k=0;k<m.length;k++)a.push(m[k])}return a}
 
-function attByKQR(b,r,c,by){
-  var i,nr,nc,p;
-  var kk=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
-  for(i=0;i<8;i++){
-    nr=r+kk[i][0];nc=c+kk[i][1];
-    if(ib(nr,nc)){
-      p=b[nr][nc];
-      if(p&&co(p)===by&&ty(p)==='K')return true;
-    }
-  }
-  var sl=[[0,1],[0,-1],[1,0],[-1,0]];
-  for(i=0;i<4;i++){
-    nr=r+sl[i][0];nc=c+sl[i][1];
-    while(ib(nr,nc)){
-      p=b[nr][nc];
-      if(p){
-        if(co(p)===by&&(ty(p)==='R'||ty(p)==='Q'))return true;
-        break;
-      }
-      nr+=sl[i][0];nc+=sl[i][1];
-    }
-  }
-  var dg=[[1,1],[1,-1],[-1,1],[-1,-1]];
-  for(i=0;i<4;i++){
-    nr=r+dg[i][0];nc=c+dg[i][1];
-    while(ib(nr,nc)){
-      p=b[nr][nc];
-      if(p){
-        if(co(p)===by&&ty(p)==='Q')return true;
-        break;
-      }
-      nr+=dg[i][0];nc+=dg[i][1];
-    }
-  }
-  return false;
-}
-
 function ev(b, c2){
   var s=0;
   var wB=0, bB=0, wN=0, bN=0, wR=0, bR=0, wQ=0, bQ=0;
@@ -1422,13 +1447,13 @@ function ev(b, c2){
       }
       
       s += (c==='w'?1:-1)*(v+ps);
-
+ 
       // Hanging/Loose piece penalty (excluding King and Pawns)
       if (t2 !== 'K' && t2 !== 'P') {
         if (!sAt(b, i, j, c)) {
           s += (c === 'w' ? -20 : 20);
           var by = c === 'w' ? 'b' : 'w';
-          if (attByKQR(b, i, j, by)) {
+          if (sAt(b, i, j, by)) {
             if (c === 'w') {
               wHangingAttacked++;
             } else {
@@ -1443,7 +1468,15 @@ function ev(b, c2){
       } else if(t2==='N'){
         if(c==='w') wN++; else bN++;
       } else if(t2==='R'){
-        if(c==='w') wR++; else bR++;
+        if(c==='w') {
+          wR++;
+          if (wP[j] === 0) { s += bP[j] === 0 ? 25 : 12; }
+          if (i === 1 || i === 0) { s += 20; }
+        } else {
+          bR++;
+          if (bP[j] === 0) { s -= wP[j] === 0 ? 25 : 12; }
+          if (i === 6 || i === 7) { s -= 20; }
+        }
       } else if(t2==='P'){
         if(c==='w') wP[j]++; else bP[j]++;
       } else if(t2==='K'){
@@ -1499,7 +1532,7 @@ function ev(b, c2){
   
   if(wB>=2) s+=30;
   if(bB>=2) s-=30;
-
+ 
   // Major-Minor Imbalance Guard (Queen vs Rook + Minor Piece)
   if (wQ > 0 && bQ === 0) {
     if (bR > 0 && (bN + bB) > 0) {
@@ -1511,7 +1544,7 @@ function ev(b, c2){
       s -= 180;
     }
   }
-
+ 
   // Multi-target attack penalty on hanging pieces
   if (wHangingAttacked >= 2) {
     s -= 150;
@@ -1543,7 +1576,17 @@ function ev(b, c2){
             }
             if(!ip) break;
           }
-          if(ip) s+=(7-i)*10;
+          if(ip) {
+            var dist = i;
+            var ppb = 0;
+            if (dist === 1) ppb = 240;
+            else if (dist === 2) ppb = 130;
+            else if (dist === 3) ppb = 65;
+            else if (dist === 4) ppb = 35;
+            else if (dist === 5) ppb = 15;
+            else if (dist === 6) ppb = 5;
+            s += ppb;
+          }
         } else {
           for(var nf=Math.max(0,j-1); nf<=Math.min(7,j+1); nf++){
             for(var nr=i+1; nr<8; nr++) {
@@ -1551,7 +1594,17 @@ function ev(b, c2){
             }
             if(!ip) break;
           }
-          if(ip) s-=i*10;
+          if(ip) {
+            var dist = 7 - i;
+            var ppb = 0;
+            if (dist === 1) ppb = 240;
+            else if (dist === 2) ppb = 130;
+            else if (dist === 3) ppb = 65;
+            else if (dist === 4) ppb = 35;
+            else if (dist === 5) ppb = 15;
+            else if (dist === 6) ppb = 5;
+            s -= ppb;
+          }
         }
       }
     }
@@ -1562,7 +1615,29 @@ function ev(b, c2){
   if(wK[0]!==-1){
     var kc=wK[1];
     for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
-      if(wP[f]===0) wShieldPenalty += bHasQueen ? 45 : 15;
+      var foundPawn = false;
+      var pawnRow = -1;
+      for (var r = 7; r >= 0; r--) {
+        if (b[r][f] === 'P') {
+          foundPawn = true;
+          pawnRow = r;
+          break;
+        }
+      }
+      var weight = (f === kc) ? 1.2 : 0.85;
+      var base = 0;
+      if (!foundPawn) {
+        base = bHasQueen ? 150 : 45;
+      } else {
+        if (pawnRow === 5) {
+          base = bHasQueen ? 45 : 20;
+        } else if (pawnRow === 4) {
+          base = bHasQueen ? 95 : 45;
+        } else if (pawnRow < 4) {
+          base = bHasQueen ? 160 : 65;
+        }
+      }
+      wShieldPenalty += base * weight;
     }
     for(var i=0; i<8; i++){
       if(b[i][kc] === 'r' || b[i][kc] === 'q'){
@@ -1573,7 +1648,29 @@ function ev(b, c2){
   if(bK[0]!==-1){
     var kc=bK[1];
     for(var f=Math.max(0,kc-1); f<=Math.min(7,kc+1); f++) {
-      if(bP[f]===0) bShieldPenalty += wHasQueen ? 45 : 15;
+      var foundPawn = false;
+      var pawnRow = -1;
+      for (var r = 0; r < 8; r++) {
+        if (b[r][f] === 'p') {
+          foundPawn = true;
+          pawnRow = r;
+          break;
+        }
+      }
+      var weight = (f === kc) ? 1.2 : 0.85;
+      var base = 0;
+      if (!foundPawn) {
+        base = wHasQueen ? 150 : 45;
+      } else {
+        if (pawnRow === 2) {
+          base = wHasQueen ? 45 : 20;
+        } else if (pawnRow === 3) {
+          base = wHasQueen ? 95 : 45;
+        } else if (pawnRow > 3) {
+          base = wHasQueen ? 160 : 65;
+        }
+      }
+      bShieldPenalty += base * weight;
     }
     for(var i=0; i<8; i++){
       if(b[i][kc] === 'R' || b[i][kc] === 'Q'){
@@ -1583,15 +1680,19 @@ function ev(b, c2){
   }
   s -= Math.round((wShieldPenalty * phase) / 24);
   s += Math.round((bShieldPenalty * phase) / 24);
-
-  // King's open files penalty (150 centipawns if castled and file with opponent rook/queen is open/half-open)
+ 
+  // King's open files penalty (120 centipawns if castled and file with opponent rook/queen is open/half-open)
   var wOpenKingFilePenalty = 0;
   if (wK[0] !== -1) {
-    var wCastledTemp = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
+    var wCastledTemp = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2)) || (phase > 8);
     if (wCastledTemp) {
       var kc = wK[1];
       for (var f = Math.max(0, kc - 1); f <= Math.min(7, kc + 1); f++) {
-        if (wP[f] === 0) {
+        var hasFriendlyPawn = false;
+        for (var r = 0; r < 8; r++) {
+          if (b[r][f] === 'P') { hasFriendlyPawn = true; break; }
+        }
+        if (!hasFriendlyPawn) {
           var oppOnFile = false;
           for (var r2 = 0; r2 < 8; r2++) {
             if (b[r2][f] === 'r' || b[r2][f] === 'q') {
@@ -1600,7 +1701,7 @@ function ev(b, c2){
             }
           }
           if (oppOnFile) {
-            wOpenKingFilePenalty += 150;
+            wOpenKingFilePenalty += 120;
           }
         }
       }
@@ -1608,11 +1709,15 @@ function ev(b, c2){
   }
   var bOpenKingFilePenalty = 0;
   if (bK[0] !== -1) {
-    var bCastledTemp = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
+    var bCastledTemp = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2)) || (phase > 8);
     if (bCastledTemp) {
       var kc = bK[1];
       for (var f = Math.max(0, kc - 1); f <= Math.min(7, kc + 1); f++) {
-        if (bP[f] === 0) {
+        var hasFriendlyPawn = false;
+        for (var r = 0; r < 8; r++) {
+          if (b[r][f] === 'p') { hasFriendlyPawn = true; break; }
+        }
+        if (!hasFriendlyPawn) {
           var oppOnFile = false;
           for (var r2 = 0; r2 < 8; r2++) {
             if (b[r2][f] === 'R' || b[r2][f] === 'Q') {
@@ -1621,15 +1726,15 @@ function ev(b, c2){
             }
           }
           if (oppOnFile) {
-            bOpenKingFilePenalty += 150;
+            bOpenKingFilePenalty += 120;
           }
         }
       }
     }
   }
-  s -= wOpenKingFilePenalty;
-  s += bOpenKingFilePenalty;
-
+  s -= Math.round((wOpenKingFilePenalty * phase) / 24);
+  s += Math.round((bOpenKingFilePenalty * phase) / 24);
+ 
   // Wedge Pawn Penalty (250 centipawns if opponent pawn is within Chebyshev distance <= 2 to castled king)
   var wWedgePenalty = 0;
   if (wK[0] !== -1) {
@@ -1672,20 +1777,37 @@ function ev(b, c2){
     var wCastled = (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2));
     if (!wCastled) {
       if (!c2.wk && !c2.wq) {
-        s -= 250;
+        s -= 65;
       } else {
-        if (!c2.wk) s -= 75;
-        if (!c2.wq) s -= 75;
+        if (!c2.wk) s -= 20;
+        if (!c2.wq) s -= 20;
       }
     }
     var bCastled = (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2));
     if (!bCastled) {
       if (!c2.bk && !c2.bq) {
-        s += 250;
+        s += 65;
       } else {
-        if (!c2.bk) s += 75;
-        if (!c2.bq) s += 75;
+        if (!c2.bk) s += 20;
+        if (!c2.bq) s += 20;
       }
+    }
+  }
+  
+  // Minor piece vs Pawns trade adjustment
+  var wMinors = wB + wN;
+  var bMinors = bB + bN;
+  var wPawnCount = 0, bPawnCount = 0;
+  for (var f = 0; f < 8; f++) {
+    wPawnCount += wP[f];
+    bPawnCount += bP[f];
+  }
+  if (phase > 8) {
+    if (wMinors < bMinors && wPawnCount > bPawnCount) {
+      s -= 110;
+    }
+    if (bMinors < wMinors && bPawnCount > wPawnCount) {
+      s += 110;
     }
   }
   
