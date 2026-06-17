@@ -92,6 +92,11 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 #pmod .pc span:hover{background:rgba(88,166,255,.2)}
 .pu{animation:pu 1s infinite}
 @keyframes pu{0%,100%{opacity:1}50%{opacity:.4}}
+.mwi{display:flex;gap:4px;width:100%;max-width:560px;padding:2px 8px;background:rgba(22,27,34,.6);border:1px solid #21262d;border-radius:5px;margin:1px 4px;font-size:clamp(.65rem,1.5vw,.78rem);flex-shrink:0;height:28px;align-items:center}
+.mwi input{flex:1;background:transparent;border:none;color:#e6edf3;font-size:clamp(.65rem,1.5vw,.78rem);outline:none;font-family:inherit;direction:rtl}
+.mwi button{padding:2px 10px;border:1px solid #30363d;background:rgba(35,134,54,.95);color:#fff;border-radius:4px;cursor:pointer;font-size:clamp(.62rem,1.5vw,.74rem);font-weight:bold;line-height:1.2;white-space:nowrap}
+.mwi button:hover{background:#2ea44f}
+.mwe{color:#ff7b72;font-size:.65rem;text-align:right;width:100%;max-width:560px;margin:0 4px;display:none;flex-shrink:0;height:14px;line-height:14px;overflow:hidden}
 </style>
 <script type="importmap">
 {
@@ -121,6 +126,11 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 <div id="sts"></div>
 <div id="bwrap"><div id="brd"></div></div>
 <div class="pi" id="bi"><span>👤</span><span id="bn">شما</span><span class="cp" id="bc"></span></div>
+<div class="mwi">
+  <input type="text" id="manMvInp" placeholder="✍️ حرکت دستی (مثال: e2e4 یا Nf3 یا اسبf3)" />
+  <button id="manMvBtn">ارسال</button>
+</div>
+<div class="mwe" id="manMvErr"></div>
 <div class="ap" id="ap"></div>
 <div class="ml" id="ml"></div>
 </div>
@@ -1476,8 +1486,59 @@ document.getElementById('btnW').onclick=function(){startG('w')};
 document.getElementById('btnB').onclick=function(){startG('b')};
 document.getElementById('btnL').onclick=function(){show('learnS');initL()};
 var gb=document.getElementById('gbar');
-[['🏠',function(){show('menuS')}],['💡پیشنهاد',function(){getHint()}],['↩️برگشت',function(){undoM()}],['🔄جدید',function(){startG(PC)}],['📋بازبینی',function(){enterRev()}]].forEach(function(x){
+[['🏠',function(){show('menuS')}],['💡پیشنهاد',function(){getHint()}],['↩️برگشت',function(){undoM()}],['🔄جدید',function(){startG(PC)}],['🔄چرخش',function(){fl=!fl;ren();}],['📋بازبینی',function(){enterRev()}]].forEach(function(x){
 var b=document.createElement('button');b.textContent=x[0];b.onclick=x[1];gb.appendChild(b);});
+
+var inp = document.getElementById('manMvInp');
+var btn = document.getElementById('manMvBtn');
+var err = document.getElementById('manMvErr');
+
+function submitManualMove() {
+  var val = inp.value.trim();
+  if (!val) return;
+  err.style.display = 'none';
+  
+  var mv = findMoveByInput(val);
+  if (mv) {
+    inp.value = '';
+    if (mv.pro) {
+      var clean = val.toLowerCase().replace(/[-x#+= ]/g, '');
+      var proPiece = 'q';
+      var autoPro = false;
+      if (clean.endsWith('q') || clean.endsWith('queen')) { proPiece = 'q'; autoPro = true; }
+      else if (clean.endsWith('r') || clean.endsWith('rook')) { proPiece = 'r'; autoPro = true; }
+      else if (clean.endsWith('b') || clean.endsWith('bishop')) { proPiece = 'b'; autoPro = true; }
+      else if (clean.endsWith('n') || clean.endsWith('knight')) { proPiece = 'n'; autoPro = true; }
+      
+      if (autoPro) {
+        var nm = cpM(mv);
+        nm.pro = false;
+        nm.pp = (tn === 'w') ? proPiece.toUpperCase() : proPiece.toLowerCase();
+        doP(nm);
+      } else {
+        sPro(mv);
+      }
+    } else {
+      doP(mv);
+    }
+  } else {
+    err.textContent = 'حرکت معتبر نیست! (مثال: e2e4 یا Nf3 یا اسبf3)';
+    err.style.display = 'block';
+  }
+}
+
+if (btn && inp) {
+  btn.onclick = submitManualMove;
+  inp.onkeydown = function(e) {
+    if (e.key === 'Enter') {
+      submitManualMove();
+    }
+  };
+  inp.oninput = function() {
+    err.style.display = 'none';
+  };
+}
+
 var rb=document.getElementById('rbar');
 [['🏠',function(){show('menuS')}],['بازگشت',function(){show('gameS')}],['▶ادامه',function(){contHere()}]].forEach(function(x){
 var b=document.createElement('button');b.textContent=x[0];b.onclick=x[1];rb.appendChild(b);});
@@ -1538,6 +1599,108 @@ else{sel=E;pms=[];ren()}
 }
 
 function cpM(m){return{fr:m.fr,fc:m.fc,tr:m.tr,tc:m.tc,cap:m.cap,cas:m.cas,epc:m.epc,epp:m.epp,pp:m.pp,pro:m.pro,pc:m.pc}}
+
+function findMoveByInput(inputStr) {
+  var clean = inputStr.trim().toLowerCase().replace(/[-x#+= ]/g, '');
+  
+  // Normalize Persian digits to English
+  var farsiDigits = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+  for (var i = 0; i < 10; i++) {
+    clean = clean.replace(farsiDigits[i], i);
+  }
+  
+  // Normalize Persian pieces to English standard algebraic letters (K, Q, R, B, N)
+  clean = clean.replace(/شاه/g, 'k')
+               .replace(/ش/g, 'k')
+               .replace(/وزیر/g, 'q')
+               .replace(/وز/g, 'q')
+               .replace(/و/g, 'q')
+               .replace(/رخ/g, 'r')
+               .replace(/ر/g, 'r')
+               .replace(/فیل/g, 'b')
+               .replace(/ف/g, 'b')
+               .replace(/اسب/g, 'n')
+               .replace(/اس/g, 'n')
+               .replace(/ا/g, 'n')
+               .replace(/س/g, 'n')
+               .replace(/پیاده/g, '')
+               .replace(/پ/g, '');
+
+  if (clean === 'o-o' || clean === 'oo' || clean === '0-0' || clean === '00' || clean === 'قلعهکوچک' || clean === 'قلعه‌کوچک') {
+    clean = 'o-o';
+  } else if (clean === 'o-o-o' || clean === 'ooo' || clean === '0-0-0' || clean === '000' || clean === 'قلعهبزرگ' || clean === 'قلعه‌بزرگ') {
+    clean = 'o-o-o';
+  }
+
+  // Find all legal moves
+  var mvs = [];
+  for (var r=0; r<8; r++) {
+    for (var c=0; c<8; c++) {
+      var p = bd[r][c];
+      if (p && co(p) === tn) {
+        var lm = leg(bd, r, c, tn, cas, epq);
+        for (var k=0; k<lm.length; k++) {
+          mvs.push(lm[k]);
+        }
+      }
+    }
+  }
+
+  // 1. Try matching by coordinates (e.g. e2e4 or e2e4q)
+  for (var i=0; i<mvs.length; i++) {
+    var mv = mvs[i];
+    var uci = s2a(mv.fr, mv.fc) + s2a(mv.tr, mv.tc);
+    var uciPro = uci + (mv.pp ? ty(mv.pp).toLowerCase() : '');
+    if (clean === uci || clean === uciPro) {
+      return mv;
+    }
+  }
+
+  // 2. Try matching algebraic notation (SAN) or simplified version
+  for (var i=0; i<mvs.length; i++) {
+    var mv = mvs[i];
+    var san = mkN(mv).toLowerCase().replace(/[#+]/g, '');
+    if (clean === san) {
+      return mv;
+    }
+    
+    // Castling shorthand
+    if (mv.cas) {
+      var isKingside = mv.tc > mv.fc;
+      if (isKingside && (clean === 'o-o' || clean === 'k')) return mv;
+      if (!isKingside && (clean === 'o-o-o' || clean === 'q')) return mv;
+    }
+
+    // Pawn moves (e.g. "e4" vs chess board notation)
+    var piece = bd[mv.fr][mv.fc];
+    var type = ty(piece);
+    if (type === 'P') {
+      var pawnDest = s2a(mv.tr, mv.tc);
+      var colFr = String.fromCharCode(97 + mv.fc);
+      if (clean === pawnDest) return mv;
+      if (clean === colFr + pawnDest) return mv;
+      if (clean === colFr + 'x' + pawnDest) return mv;
+    } else {
+      // Piece moves e.g. "Nf3"
+      var pieceChar = type.toLowerCase();
+      var pDest = s2a(mv.tr, mv.tc);
+      if (clean === pieceChar + pDest) return mv;
+      if (clean === pieceChar + 'x' + pDest) return mv;
+      
+      // With disambiguation (e.g. Ned2, R1e2)
+      var colFr = String.fromCharCode(97 + mv.fc);
+      var rowFr = (8 - mv.fr).toString();
+      if (clean === pieceChar + colFr + pDest) return mv;
+      if (clean === pieceChar + rowFr + pDest) return mv;
+      if (clean === pieceChar + colFr + 'x' + pDest) return mv;
+      if (clean === pieceChar + rowFr + 'x' + pDest) return mv;
+      if (clean === pieceChar + colFr + rowFr + pDest) return mv;
+      if (clean === pieceChar + colFr + rowFr + 'x' + pDest) return mv;
+    }
+  }
+
+  return null;
+}
 function sH(){hs.push({bd:cln(bd),tn:tn,cas:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},ep:epq,lmv:lmv,cW:cW.slice(),cB:cB.slice(),mn:mn})}
 function doP(mv){
 var bB=cln(bd),crB={wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},epB=epq;
