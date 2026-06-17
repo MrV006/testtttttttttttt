@@ -591,6 +591,10 @@ function ev(b, c2){ // WK_EV_FUNC
         // Handled in preamble
       } else if(t2==='Q'){
         if(c==='w') { wQ++; wHasQueen=true; } else { bQ++; bHasQueen=true; }
+        if (phase > 18) {
+          if (c === 'w' && i < 6) s -= 45;
+          if (c === 'b' && i > 1) s += 45;
+        }
         // Defensive Queen Behind Pawns in Opening
         var hasShield = false;
         if (c === 'w') {
@@ -2001,6 +2005,10 @@ function ev(b, c2){
         // Handled in preamble
       } else if(t2==='Q'){
         if(c==='w') { wQ++; wHasQueen=true; } else { bQ++; bHasQueen=true; }
+        if (phase > 18) {
+          if (c === 'w' && i < 6) s -= 45;
+          if (c === 'b' && i > 1) s += 45;
+        }
         // Defensive Queen Behind Pawns in Opening
         var hasShield = false;
         if (c === 'w') {
