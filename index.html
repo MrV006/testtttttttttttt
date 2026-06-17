@@ -32,7 +32,7 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 
 /* Board - dynamically sized by JS */
 #bwrap{display:flex;align-items:center;justify-content:center;flex-shrink:1;flex-grow:1;width:100%;min-height:0;padding:1px}
-#brd{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border-radius:3px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.5);border:2px solid #555}
+#brd{direction:ltr;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border-radius:3px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.5);border:2px solid #555}
 .sq{display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;user-select:none;line-height:1;overflow:hidden}
 .sq::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;background:var(--bg-ov,transparent)}
 .sq.l{background:#f0d9b5}.sq.d{background:#b58863}
@@ -64,7 +64,7 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 /* Review */
 #revS{overflow-y:auto;padding:4px}
 .rvbw{width:min(70vw,320px);aspect-ratio:1;margin:4px auto;flex-shrink:0}
-.rvg{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:100%;height:100%;border-radius:3px;overflow:hidden;border:2px solid #555}
+.rvg{direction:ltr;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:100%;height:100%;border-radius:3px;overflow:hidden;border:2px solid #555}
 .rn{display:flex;gap:4px;margin:4px 0;align-items:center;justify-content:center;flex-shrink:0}
 .rn button{padding:5px 12px;border:1px solid #30363d;background:#161b22;color:#e6edf3;border-radius:5px;cursor:pointer;font-size:.85rem}
 .rn button:hover{background:#21262d;border-color:#58a6ff}
@@ -358,6 +358,104 @@ function ev(b, c2){ // WK_EV_FUNC
   }
   var phase = Math.min(24, totalPhase);
   
+  var pinnedMap = {};
+  var orthogonalDirs = [[0,1],[0,-1],[1,0],[-1,0]];
+  var diagonalDirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+  function findPins(side, kingPos, queenPos) {
+    if (kingPos[0] !== -1) {
+      for (var d = 0; d < 4; d++) {
+        var dr = orthogonalDirs[d][0], dc = orthogonalDirs[d][1];
+        var nr = kingPos[0] + dr, nc = kingPos[1] + dc;
+        var firstBlocker = null;
+        while (ib(nr, nc)) {
+          var p = b[nr][nc];
+          if (p) {
+            if (co(p) === side) {
+              if (firstBlocker === null) { firstBlocker = [nr, nc]; } else { break; }
+            } else {
+              if (firstBlocker !== null) {
+                if (ty(p) === 'R' || ty(p) === 'Q') {
+                  pinnedMap[firstBlocker[0] + "," + firstBlocker[1]] = 2;
+                }
+              }
+              break;
+            }
+          }
+          nr += dr; nc += dc;
+        }
+      }
+      for (var d = 0; d < 4; d++) {
+        var dr = diagonalDirs[d][0], dc = diagonalDirs[d][1];
+        var nr = kingPos[0] + dr, nc = kingPos[1] + dc;
+        var firstBlocker = null;
+        while (ib(nr, nc)) {
+          var p = b[nr][nc];
+          if (p) {
+            if (co(p) === side) {
+              if (firstBlocker === null) { firstBlocker = [nr, nc]; } else { break; }
+            } else {
+              if (firstBlocker !== null) {
+                if (ty(p) === 'B' || ty(p) === 'Q') {
+                  pinnedMap[firstBlocker[0] + "," + firstBlocker[1]] = 2;
+                }
+              }
+              break;
+            }
+          }
+          nr += dr; nc += dc;
+        }
+      }
+    }
+    if (queenPos[0] !== -1) {
+      for (var d = 0; d < 4; d++) {
+        var dr = orthogonalDirs[d][0], dc = orthogonalDirs[d][1];
+        var nr = queenPos[0] + dr, nc = queenPos[1] + dc;
+        var firstBlocker = null;
+        while (ib(nr, nc)) {
+          var p = b[nr][nc];
+          if (p) {
+            if (co(p) === side) {
+              if (firstBlocker === null) { firstBlocker = [nr, nc]; } else { break; }
+            } else {
+              if (firstBlocker !== null) {
+                if (ty(p) === 'R' || ty(p) === 'Q') {
+                  var key = firstBlocker[0] + "," + firstBlocker[1];
+                  if (!pinnedMap[key]) pinnedMap[key] = 1;
+                }
+              }
+              break;
+            }
+          }
+          nr += dr; nc += dc;
+        }
+      }
+      for (var d = 0; d < 4; d++) {
+        var dr = diagonalDirs[d][0], dc = diagonalDirs[d][1];
+        var nr = queenPos[0] + dr, nc = queenPos[1] + dc;
+        var firstBlocker = null;
+        while (ib(nr, nc)) {
+          var p = b[nr][nc];
+          if (p) {
+            if (co(p) === side) {
+              if (firstBlocker === null) { firstBlocker = [nr, nc]; } else { break; }
+            } else {
+              if (firstBlocker !== null) {
+                if (ty(p) === 'B' || ty(p) === 'Q') {
+                  var key = firstBlocker[0] + "," + firstBlocker[1];
+                  if (!pinnedMap[key]) pinnedMap[key] = 1;
+                }
+              }
+              break;
+            }
+          }
+          nr += dr; nc += dc;
+        }
+      }
+    }
+  }
+  findPins('w', wK, wQPos);
+  findPins('b', bK, bQPos);
+  
   if (phase > 15) {
     if (b[6][4] === 'Q' && b[7][5] === 'B') s -= 35;
     if (b[1][4] === 'q' && b[0][5] === 'b') s += 35;
@@ -406,91 +504,8 @@ function ev(b, c2){ // WK_EV_FUNC
         var isAttacked = sAt(b, i, j, by);
         
         // Pinned piece evaluation
-        var myKingPos = c === 'w' ? wK : bK;
-        var myQueenPos = c === 'w' ? wQPos : bQPos;
-        var isPinned = false;
-        var pinLevel = 0; // 1 = Queen, 2 = King
-        var origPiece = b[i][j];
-        b[i][j] = E;
-        
-        // King pin check
-        if (myKingPos[0] !== -1) {
-          var kp = myKingPos;
-          var sl_dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-          for (var k_dir=0; k_dir<4; k_dir++) {
-            var nr = kp[0]+sl_dirs[k_dir][0], nc = kp[1]+sl_dirs[k_dir][1];
-            while (ib(nr, nc)) {
-              var oppP = b[nr][nc];
-              if (oppP) {
-                if (co(oppP) === by && (ty(oppP)==='R'||ty(oppP)==='Q')) {
-                  isPinned = true;
-                  pinLevel = 2;
-                }
-                break;
-              }
-              nr += sl_dirs[k_dir][0]; nc += sl_dirs[k_dir][1];
-            }
-            if (isPinned) break;
-          }
-          if (!isPinned) {
-            var dg_dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
-            for (var k_dir=0; k_dir<4; k_dir++) {
-              var nr = kp[0]+dg_dirs[k_dir][0], nc = kp[1]+dg_dirs[k_dir][1];
-              while (ib(nr, nc)) {
-                var oppP = b[nr][nc];
-                if (oppP) {
-                  if (co(oppP) === by && (ty(oppP)==='B'||ty(oppP)==='Q')) {
-                    isPinned = true;
-                    pinLevel = 2;
-                  }
-                  break;
-                }
-                nr += dg_dirs[k_dir][0]; nc += dg_dirs[k_dir][1];
-              }
-              if (isPinned) break;
-            }
-          }
-        }
-        
-        // Queen pin check
-        if (!isPinned && myQueenPos[0] !== -1) {
-          var qp = myQueenPos;
-          var sl_dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-          for (var k_dir=0; k_dir<4; k_dir++) {
-            var nr = qp[0]+sl_dirs[k_dir][0], nc = qp[1]+sl_dirs[k_dir][1];
-            while (ib(nr, nc)) {
-              var oppP = b[nr][nc];
-              if (oppP) {
-                if (co(oppP) === by && (ty(oppP)==='R'||ty(oppP)==='Q')) {
-                  isPinned = true;
-                  pinLevel = 1;
-                }
-                break;
-              }
-              nr += sl_dirs[k_dir][0]; nc += sl_dirs[k_dir][1];
-            }
-            if (isPinned) break;
-          }
-          if (!isPinned) {
-            var dg_dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
-            for (var k_dir=0; k_dir<4; k_dir++) {
-              var nr = qp[0]+dg_dirs[k_dir][0], nc = qp[1]+dg_dirs[k_dir][1];
-              while (ib(nr, nc)) {
-                var oppP = b[nr][nc];
-                if (oppP) {
-                  if (co(oppP) === by && (ty(oppP)==='B'||ty(oppP)==='Q')) {
-                    isPinned = true;
-                    pinLevel = 1;
-                  }
-                  break;
-                }
-                nr += dg_dirs[k_dir][0]; nc += dg_dirs[k_dir][1];
-              }
-              if (isPinned) break;
-            }
-          }
-        }
-        b[i][j] = origPiece;
+        var isPinned = pinnedMap[i + "," + j] !== undefined;
+        var pinLevel = pinnedMap[i + "," + j] || 0;
         
         if (isPinned) {
           var pinPen = (pinLevel === 2) ? 40 : 20;
@@ -1600,6 +1615,104 @@ function ev(b, c2){
   }
   var phase = Math.min(24, totalPhase);
   
+  var pinnedMap = {};
+  var orthogonalDirs = [[0,1],[0,-1],[1,0],[-1,0]];
+  var diagonalDirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+  function findPins(side, kingPos, queenPos) {
+    if (kingPos[0] !== -1) {
+      for (var d = 0; d < 4; d++) {
+        var dr = orthogonalDirs[d][0], dc = orthogonalDirs[d][1];
+        var nr = kingPos[0] + dr, nc = kingPos[1] + dc;
+        var firstBlocker = null;
+        while (ib(nr, nc)) {
+          var p = b[nr][nc];
+          if (p) {
+            if (co(p) === side) {
+              if (firstBlocker === null) { firstBlocker = [nr, nc]; } else { break; }
+            } else {
+              if (firstBlocker !== null) {
+                if (ty(p) === 'R' || ty(p) === 'Q') {
+                  pinnedMap[firstBlocker[0] + "," + firstBlocker[1]] = 2;
+                }
+              }
+              break;
+            }
+          }
+          nr += dr; nc += dc;
+        }
+      }
+      for (var d = 0; d < 4; d++) {
+        var dr = diagonalDirs[d][0], dc = diagonalDirs[d][1];
+        var nr = kingPos[0] + dr, nc = kingPos[1] + dc;
+        var firstBlocker = null;
+        while (ib(nr, nc)) {
+          var p = b[nr][nc];
+          if (p) {
+            if (co(p) === side) {
+              if (firstBlocker === null) { firstBlocker = [nr, nc]; } else { break; }
+            } else {
+              if (firstBlocker !== null) {
+                if (ty(p) === 'B' || ty(p) === 'Q') {
+                  pinnedMap[firstBlocker[0] + "," + firstBlocker[1]] = 2;
+                }
+              }
+              break;
+            }
+          }
+          nr += dr; nc += dc;
+        }
+      }
+    }
+    if (queenPos[0] !== -1) {
+      for (var d = 0; d < 4; d++) {
+        var dr = orthogonalDirs[d][0], dc = orthogonalDirs[d][1];
+        var nr = queenPos[0] + dr, nc = queenPos[1] + dc;
+        var firstBlocker = null;
+        while (ib(nr, nc)) {
+          var p = b[nr][nc];
+          if (p) {
+            if (co(p) === side) {
+              if (firstBlocker === null) { firstBlocker = [nr, nc]; } else { break; }
+            } else {
+              if (firstBlocker !== null) {
+                if (ty(p) === 'R' || ty(p) === 'Q') {
+                  var key = firstBlocker[0] + "," + firstBlocker[1];
+                  if (!pinnedMap[key]) pinnedMap[key] = 1;
+                }
+              }
+              break;
+            }
+          }
+          nr += dr; nc += dc;
+        }
+      }
+      for (var d = 0; d < 4; d++) {
+        var dr = diagonalDirs[d][0], dc = diagonalDirs[d][1];
+        var nr = queenPos[0] + dr, nc = queenPos[1] + dc;
+        var firstBlocker = null;
+        while (ib(nr, nc)) {
+          var p = b[nr][nc];
+          if (p) {
+            if (co(p) === side) {
+              if (firstBlocker === null) { firstBlocker = [nr, nc]; } else { break; }
+            } else {
+              if (firstBlocker !== null) {
+                if (ty(p) === 'B' || ty(p) === 'Q') {
+                  var key = firstBlocker[0] + "," + firstBlocker[1];
+                  if (!pinnedMap[key]) pinnedMap[key] = 1;
+                }
+              }
+              break;
+            }
+          }
+          nr += dr; nc += dc;
+        }
+      }
+    }
+  }
+  findPins('w', wK, wQPos);
+  findPins('b', bK, bQPos);
+  
   if (phase > 15) {
     if (b[6][4] === 'Q' && b[7][5] === 'B') s -= 35;
     if (b[1][4] === 'q' && b[0][5] === 'b') s += 35;
@@ -1648,91 +1761,8 @@ function ev(b, c2){
         var isAttacked = sAt(b, i, j, by);
         
         // Pinned piece evaluation
-        var myKingPos = c === 'w' ? wK : bK;
-        var myQueenPos = c === 'w' ? wQPos : bQPos;
-        var isPinned = false;
-        var pinLevel = 0; // 1 = Queen, 2 = King
-        var origPiece = b[i][j];
-        b[i][j] = E;
-        
-        // King pin check
-        if (myKingPos[0] !== -1) {
-          var kp = myKingPos;
-          var sl_dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-          for (var k_dir=0; k_dir<4; k_dir++) {
-            var nr = kp[0]+sl_dirs[k_dir][0], nc = kp[1]+sl_dirs[k_dir][1];
-            while (ib(nr, nc)) {
-              var oppP = b[nr][nc];
-              if (oppP) {
-                if (co(oppP) === by && (ty(oppP)==='R'||ty(oppP)==='Q')) {
-                  isPinned = true;
-                  pinLevel = 2;
-                }
-                break;
-              }
-              nr += sl_dirs[k_dir][0]; nc += sl_dirs[k_dir][1];
-            }
-            if (isPinned) break;
-          }
-          if (!isPinned) {
-            var dg_dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
-            for (var k_dir=0; k_dir<4; k_dir++) {
-              var nr = kp[0]+dg_dirs[k_dir][0], nc = kp[1]+dg_dirs[k_dir][1];
-              while (ib(nr, nc)) {
-                var oppP = b[nr][nc];
-                if (oppP) {
-                  if (co(oppP) === by && (ty(oppP)==='B'||ty(oppP)==='Q')) {
-                    isPinned = true;
-                    pinLevel = 2;
-                  }
-                  break;
-                }
-                nr += dg_dirs[k_dir][0]; nc += dg_dirs[k_dir][1];
-              }
-              if (isPinned) break;
-            }
-          }
-        }
-        
-        // Queen pin check
-        if (!isPinned && myQueenPos[0] !== -1) {
-          var qp = myQueenPos;
-          var sl_dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-          for (var k_dir=0; k_dir<4; k_dir++) {
-            var nr = qp[0]+sl_dirs[k_dir][0], nc = qp[1]+sl_dirs[k_dir][1];
-            while (ib(nr, nc)) {
-              var oppP = b[nr][nc];
-              if (oppP) {
-                if (co(oppP) === by && (ty(oppP)==='R'||ty(oppP)==='Q')) {
-                  isPinned = true;
-                  pinLevel = 1;
-                }
-                break;
-              }
-              nr += sl_dirs[k_dir][0]; nc += sl_dirs[k_dir][1];
-            }
-            if (isPinned) break;
-          }
-          if (!isPinned) {
-            var dg_dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
-            for (var k_dir=0; k_dir<4; k_dir++) {
-              var nr = qp[0]+dg_dirs[k_dir][0], nc = qp[1]+dg_dirs[k_dir][1];
-              while (ib(nr, nc)) {
-                var oppP = b[nr][nc];
-                if (oppP) {
-                  if (co(oppP) === by && (ty(oppP)==='B'||ty(oppP)==='Q')) {
-                    isPinned = true;
-                    pinLevel = 1;
-                  }
-                  break;
-                }
-                nr += dg_dirs[k_dir][0]; nc += dg_dirs[k_dir][1];
-              }
-              if (isPinned) break;
-            }
-          }
-        }
-        b[i][j] = origPiece;
+        var isPinned = pinnedMap[i + "," + j] !== undefined;
+        var pinLevel = pinnedMap[i + "," + j] || 0;
         
         if (isPinned) {
           var pinPen = (pinLevel === 2) ? 40 : 20;
