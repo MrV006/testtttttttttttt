@@ -735,14 +735,14 @@ function ev(b, c2){ // WK_EV_FUNC
       var weight = (f === kc) ? 1.2 : 0.85;
       var base = 0;
       if (!foundPawn) {
-        base = bHasQueen ? 150 : 45;
+        base = bHasQueen ? 55 : 20;
       } else {
         if (pawnRow === 5) {
-          base = bHasQueen ? 45 : 20;
+          base = bHasQueen ? 15 : 8;
         } else if (pawnRow === 4) {
-          base = bHasQueen ? 95 : 45;
+          base = bHasQueen ? 35 : 18;
         } else if (pawnRow < 4) {
-          base = bHasQueen ? 160 : 65;
+          base = bHasQueen ? 60 : 25;
         }
       }
       wShieldPenalty += base * weight;
@@ -768,14 +768,14 @@ function ev(b, c2){ // WK_EV_FUNC
       var weight = (f === kc) ? 1.2 : 0.85;
       var base = 0;
       if (!foundPawn) {
-        base = wHasQueen ? 150 : 45;
+        base = wHasQueen ? 55 : 20;
       } else {
         if (pawnRow === 2) {
-          base = wHasQueen ? 45 : 20;
+          base = wHasQueen ? 15 : 8;
         } else if (pawnRow === 3) {
-          base = wHasQueen ? 95 : 45;
+          base = wHasQueen ? 35 : 18;
         } else if (pawnRow > 3) {
-          base = wHasQueen ? 160 : 65;
+          base = wHasQueen ? 60 : 25;
         }
       }
       bShieldPenalty += base * weight;
@@ -2145,14 +2145,14 @@ function ev(b, c2){
       var weight = (f === kc) ? 1.2 : 0.85;
       var base = 0;
       if (!foundPawn) {
-        base = bHasQueen ? 150 : 45;
+        base = bHasQueen ? 55 : 20;
       } else {
         if (pawnRow === 5) {
-          base = bHasQueen ? 45 : 20;
+          base = bHasQueen ? 15 : 8;
         } else if (pawnRow === 4) {
-          base = bHasQueen ? 95 : 45;
+          base = bHasQueen ? 35 : 18;
         } else if (pawnRow < 4) {
-          base = bHasQueen ? 160 : 65;
+          base = bHasQueen ? 60 : 25;
         }
       }
       wShieldPenalty += base * weight;
@@ -2178,14 +2178,14 @@ function ev(b, c2){
       var weight = (f === kc) ? 1.2 : 0.85;
       var base = 0;
       if (!foundPawn) {
-        base = wHasQueen ? 150 : 45;
+        base = wHasQueen ? 55 : 20;
       } else {
         if (pawnRow === 2) {
-          base = wHasQueen ? 45 : 20;
+          base = wHasQueen ? 15 : 8;
         } else if (pawnRow === 3) {
-          base = wHasQueen ? 95 : 45;
+          base = wHasQueen ? 35 : 18;
         } else if (pawnRow > 3) {
-          base = wHasQueen ? 160 : 65;
+          base = wHasQueen ? 60 : 25;
         }
       }
       bShieldPenalty += base * weight;
