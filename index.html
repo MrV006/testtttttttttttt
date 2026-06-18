@@ -1521,7 +1521,7 @@ self.onmessage=function(e){
     
     for(var currentDepth = 1; currentDepth <= maxDepth; currentDepth++){
       var res;
-      var delta = 35; // Fine centipawn margin for narrowing first-step search
+      var delta = 90; // Fine centipawn margin for narrowing first-step search
       
       if (currentDepth >= 3 && bestResult !== null && Math.abs(bestResult.s) < 15000) {
         var alphaBound = bestResult.s - delta;
@@ -1546,7 +1546,7 @@ self.onmessage=function(e){
       bestResult = res;
       
       var elapsed = Date.now() - globalStartTime;
-      var threshold = globalTimeLimit * (maxDepth >= 8 ? 0.45 : 0.40);
+      var threshold = globalTimeLimit * (maxDepth >= 8 ? 0.60 : (maxDepth <= 4 ? 0.80 : 0.70));
       if(elapsed > threshold){
         break;
       }
@@ -1557,7 +1557,17 @@ self.onmessage=function(e){
       bestResult = mmx(d.bd, 1, d.al, d.bt, d.mx, d.c2, d.eps);
     }
     
-    self.postMessage({type:'result',id:d.id,res:bestResult});
+    var finalDepth = bestResult ? (bestResult.move ? (bestResult.s !== undefined ? (Math.min(maxDepth, Math.max(1, currentDepth - 1))) : 1) : 1) : 1;
+    self.postMessage({
+      type: 'result',
+      id: d.id,
+      res: {
+        move: bestResult ? bestResult.move : null,
+        s: bestResult ? bestResult.s : 0,
+        depth: finalDepth,
+        elapsed: Date.now() - globalStartTime
+      }
+    });
   }
 };
 `;
@@ -3133,13 +3143,13 @@ function aiTn(){
           }
         }
 
-        var d2 = [2, 3, 5, 8][Math.min(df-1, 3)];
-        var baseBudgets = [300, 1200, 2500, 15000];
+        var d2 = [3, 4, 6, 8][Math.min(df-1, 3)];
+        var baseBudgets = [500, 1800, 3500, 15000];
         var timeLimit = baseBudgets[Math.min(df-1, 3)];
         
         if (isDangerous) {
-          d2 += 2;
-          timeLimit *= 2;
+          d2 += 1;
+          timeLimit *= 1.5;
         }
 
         if (userTimeLimit !== 'default') {
@@ -3148,7 +3158,7 @@ function aiTn(){
         
         var pcCount=0;
         for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c])pcCount++;
-        if(pcCount<12)d2+=2; // Search deeper in endgame since branching factor is very low
+        if(pcCount<12)d2+=1; // Search deeper in endgame since branching factor is very low
         
         terminateWorker();
         var worker=getWorker();
@@ -3172,6 +3182,15 @@ function aiTn(){
             if(!fd&&rms2.length>0)fd=rms2[0];
             best=fd;
             applyAiMove(best,aiC,false);
+            if (res && res.depth !== undefined && !ov) {
+              var evalVal = res.s;
+              if (aiC === 'b') {
+                evalVal = -evalVal;
+              }
+              var evalText = (evalVal / 100).toFixed(2);
+              var depthText = "🎯 نوبت شما | 🧠 AI: عمق " + res.depth + "، ارزیابی: " + evalText + " (" + (res.elapsed / 1000).toFixed(2) + " ثانیه)";
+              document.getElementById('sts').textContent = depthText;
+            }
           }
         };
         worker.postMessage({
