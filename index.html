@@ -347,6 +347,35 @@ function fK(b,col){var k=col==='w'?'K':'k';for(var i=0;i<8;i++)for(var j=0;j<8;j
 function iCk(b,col){var kp=fK(b,col);return kp?sAt(b,kp[0],kp[1],col==='w'?'b':'w'):false}
 function leg(b,r,c,col,c2,eps){var mvs=raw(b,r,c,col,eps);if(ty(b[r][c])==='K'){var cm=casM(b,col,c2);for(var i=0;i<cm.length;i++)mvs.push(cm[i])}var out=[];for(var j=0;j<mvs.length;j++){appM(b,mvs[j]);var ok=!iCk(b,col);undMv(b,mvs[j]);if(ok)out.push(mvs[j])}return out}
 function aLeg(b,col,c2,eps){var a=[];for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&co(b[i][j])===col){var m=leg(b,i,j,col,c2,eps);for(var k=0;k<m.length;k++)a.push(m[k])}return a}
+function aLegCaps(b,col,eps,includeChecks,qdepth,checksCount,c2){
+  var a=[];
+  var opp=col==='w'?'b':'w';
+  for(var i=0;i<8;i++){
+    for(var j=0;j<8;j++){
+      if(b[i][j]&&co(b[i][j])===col){
+        var mvs=raw(b,i,j,col,eps);
+        for(var k=0;k<mvs.length;k++){
+          var m=mvs[k];
+          var isCap=m.cap!==null;
+          var isPro=m.pro===true;
+          var isIncluded=isCap||isPro;
+          if(!isIncluded&&includeChecks&&qdepth<3&&checksCount>0){
+            appM(b,m);var putsOppInCheck=iCk(b,opp);undMv(b,m);
+            if(putsOppInCheck)isIncluded=true;
+          }
+          if(isIncluded){
+            appM(b,m);var isLegal=!iCk(b,col);undMv(b,m);
+            if(isLegal){
+              if(m.pro){m.pp=col==='w'?'Q':'q';m.pro=false}
+              a.push(m);
+            }
+          }
+        }
+      }
+    }
+  }
+  return a;
+}
 
 function ev(b, c2){ // WK_EV_FUNC
   var s=0;
@@ -618,24 +647,36 @@ function ev(b, c2){ // WK_EV_FUNC
         if(c==='w') {
           wB++;
           if (phase > 8 && i < 7 && coversCenter(i, j, 'B')) {
-            s += Math.round((15 * phase) / 24);
+            s += Math.round((25 * phase) / 24);
+          }
+          if (phase > 8 && i === 7 && (j === 2 || j === 5)) {
+            s -= 25;
           }
         } else {
           bB++;
           if (phase > 8 && i > 0 && coversCenter(i, j, 'B')) {
-            s -= Math.round((15 * phase) / 24);
+            s -= Math.round((25 * phase) / 24);
+          }
+          if (phase > 8 && i === 0 && (j === 2 || j === 5)) {
+            s += 25;
           }
         }
       } else if(t2==='N'){
         if(c==='w') {
           wN++;
           if (phase > 8 && i < 7 && coversCenter(i, j, 'N')) {
-            s += Math.round((15 * phase) / 24);
+            s += Math.round((25 * phase) / 24);
+          }
+          if (phase > 8 && i === 7 && (j === 1 || j === 6)) {
+            s -= 25;
           }
         } else {
           bN++;
           if (phase > 8 && i > 0 && coversCenter(i, j, 'N')) {
-            s -= Math.round((15 * phase) / 24);
+            s -= Math.round((25 * phase) / 24);
+          }
+          if (phase > 8 && i === 0 && (j === 1 || j === 6)) {
+            s += 25;
           }
         }
       } else if (false) { // structural alignment
@@ -973,10 +1014,24 @@ function ev(b, c2){ // WK_EV_FUNC
   // Open e-file castling penalty
   if (phase > 8 && wP[4] === 0 && bP[4] === 0) {
     if (wK[0] === 7 && wK[1] === 4) {
-      s -= Math.round((70 * phase) / 24);
+      var wOpenEFileDanger = 150;
+      for (var r = 0; r < 8; r++) {
+        if (b[r][4] === 'r' || b[r][4] === 'q') {
+          wOpenEFileDanger += 100;
+          break;
+        }
+      }
+      s -= Math.round((wOpenEFileDanger * phase) / 24);
     }
     if (bK[0] === 0 && bK[1] === 4) {
-      s += Math.round((70 * phase) / 24);
+      var bOpenEFileDanger = 150;
+      for (var r = 0; r < 8; r++) {
+        if (b[r][4] === 'R' || b[r][4] === 'Q') {
+          bOpenEFileDanger += 100;
+          break;
+        }
+      }
+      s += Math.round((bOpenEFileDanger * phase) / 24);
     }
   }
   
@@ -1220,14 +1275,7 @@ var val=ev(b,c2);
 if(mx){
 if(val>=bt)return val;
 if(val>al)al=val;
-var mvs=aLeg(b,'w',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){
-if(m.cap)return true;
-if(qdepth < 3 && checksCount > 0){
-appM(b,m);var gc=iCk(b,'b');undMv(b,m);
-return gc;
-}
-return false;
-});
+var mvs=aLegCaps(b,'w',E,true,qdepth,checksCount,c2);
 ord(b,mvs);
 for(var i=0;i<mvs.length;i++){
 appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2,qdepth+1,checksCount);undMv(b,mvs[i]);
@@ -1238,14 +1286,7 @@ return al;
 }else{
 if(val<=al)return val;
 if(val<bt)bt=val;
-var mvs=aLeg(b,'b',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){
-if(m.cap)return true;
-if(qdepth < 3 && checksCount > 0){
-appM(b,m);var gc=iCk(b,'w');undMv(b,m);
-return gc;
-}
-return false;
-});
+var mvs=aLegCaps(b,'b',E,true,qdepth,checksCount,c2);
 ord(b,mvs);
 for(var i=0;i<mvs.length;i++){
 appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2,qdepth+1,checksCount);undMv(b,mvs[i]);
@@ -1839,8 +1880,37 @@ function fK(b,col){var k=col==='w'?'K':'k';for(var i=0;i<8;i++)for(var j=0;j<8;j
 function iCk(b,col){var kp=fK(b,col);return kp?sAt(b,kp[0],kp[1],col==='w'?'b':'w'):false}
 function leg(b,r,c,col,c2,eps){var mvs=raw(b,r,c,col,eps);if(ty(b[r][c])==='K'){var cm=casM(b,col,c2);for(var i=0;i<cm.length;i++)mvs.push(cm[i])}var out=[];for(var j=0;j<mvs.length;j++){appM(b,mvs[j]);var ok=!iCk(b,col);undMv(b,mvs[j]);if(ok)out.push(mvs[j])}return out}
 function aLeg(b,col,c2,eps){var a=[];for(var i=0;i<8;i++)for(var j=0;j<8;j++)if(b[i][j]&&co(b[i][j])===col){var m=leg(b,i,j,col,c2,eps);for(var k=0;k<m.length;k++)a.push(m[k])}return a}
+function aLegCaps(b,col,eps,includeChecks,qdepth,checksCount,c2){
+  var a=[];
+  var opp=col==='w'?'b':'w';
+  for(var i=0;i<8;i++){
+    for(var j=0;j<8;j++){
+      if(b[i][j]&&co(b[i][j])===col){
+        var mvs=raw(b,i,j,col,eps);
+        for(var k=0;k<mvs.length;k++){
+          var m=mvs[k];
+          var isCap=m.cap!==null;
+          var isPro=m.pro===true;
+          var isIncluded=isCap||isPro;
+          if(!isIncluded&&includeChecks&&qdepth<3&&checksCount>0){
+            appM(b,m);var putsOppInCheck=iCk(b,opp);undMv(b,m);
+            if(putsOppInCheck)isIncluded=true;
+          }
+          if(isIncluded){
+            appM(b,m);var isLegal=!iCk(b,col);undMv(b,m);
+            if(isLegal){
+              if(m.pro){m.pp=col==='w'?'Q':'q';m.pro=false}
+              a.push(m);
+            }
+          }
+        }
+      }
+    }
+  }
+  return a;
+}
 
-function ev(b, c2){
+function ev(b, c2){ // MAIN_THREAD_EV
   var s=0;
   var wB=0, bB=0, wN=0, bN=0, wR=0, bR=0, wQ=0, bQ=0;
   var wP=[0,0,0,0,0,0,0,0], bP=[0,0,0,0,0,0,0,0];
@@ -1852,7 +1922,7 @@ function ev(b, c2){
   var totalPhase = 0;
   
   var wQPos=[-1,-1], bQPos=[-1,-1];
-  function coversCenter(r, c, tPiece) {
+  function coversCenterMT(r, c, tPiece) {
     var targets = [[3,3], [3,4], [4,3], [4,4]];
     for (var k=0; k<4; k++) {
       var tr = targets[k][0], tc = targets[k][1];
@@ -1906,7 +1976,7 @@ function ev(b, c2){
   var pinnedMap = {};
   var orthogonalDirs = [[0,1],[0,-1],[1,0],[-1,0]];
   var diagonalDirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
-  function findPins(side, kingPos, queenPos) {
+  function findPinsMT(side, kingPos, queenPos) {
     if (kingPos[0] !== -1) {
       for (var d = 0; d < 4; d++) {
         var dr = orthogonalDirs[d][0], dc = orthogonalDirs[d][1];
@@ -1998,13 +2068,15 @@ function ev(b, c2){
       }
     }
   }
-  findPins('w', wK, wQPos);
-  findPins('b', bK, bQPos);
+  findPinsMT('w', wK, wQPos);
+  findPinsMT('b', bK, bQPos);
   
   if (phase > 15) {
     if (b[6][4] === 'Q' && b[7][5] === 'B') s -= 35;
     if (b[1][4] === 'q' && b[0][5] === 'b') s += 35;
   }
+  
+  // MAIN_EV_LOOP
 
   for (var i=0; i<8; i++){
     for (var j=0; j<8; j++){
@@ -2025,7 +2097,7 @@ function ev(b, c2){
       
       s += (c==='w'?1:-1)*(v+ps);
  
-      // Wing pawn push penalty in opening
+      // Wing pawn push penalty in opening (MAIN)
       if (phase > 12 && t2 === 'P') {
         if (j === 0 || j === 7) {
           if (c === 'w') {
@@ -2042,7 +2114,7 @@ function ev(b, c2){
         }
       }
 
-      // Tactical vulnerability and blunder safety penalty
+      // Tactical vulnerability and blunder safety penalty (MAIN)
       if (t2 !== 'K') {
         var isDefended = sAt(b, i, j, c);
         var by = c === 'w' ? 'b' : 'w';
@@ -2109,25 +2181,37 @@ function ev(b, c2){
       if(t2==='B'){
         if(c==='w') {
           wB++;
-          if (phase > 8 && i < 7 && coversCenter(i, j, 'B')) {
-            s += Math.round((15 * phase) / 24);
+          if (phase > 8 && i < 7 && coversCenterMT(i, j, 'B')) {
+            s += Math.round((25 * phase) / 24);
+          }
+          if (phase > 8 && i === 7 && (j === 2 || j === 5)) {
+            s -= 25;
           }
         } else {
           bB++;
-          if (phase > 8 && i > 0 && coversCenter(i, j, 'B')) {
-            s -= Math.round((15 * phase) / 24);
+          if (phase > 8 && i > 0 && coversCenterMT(i, j, 'B')) {
+            s -= Math.round((25 * phase) / 24);
+          }
+          if (phase > 8 && i === 0 && (j === 2 || j === 5)) {
+            s += 25;
           }
         }
       } else if(t2==='N'){
         if(c==='w') {
           wN++;
-          if (phase > 8 && i < 7 && coversCenter(i, j, 'N')) {
-            s += Math.round((15 * phase) / 24);
+          if (phase > 8 && i < 7 && coversCenterMT(i, j, 'N')) {
+            s += Math.round((25 * phase) / 24);
+          }
+          if (phase > 8 && i === 7 && (j === 1 || j === 6)) {
+            s -= 25;
           }
         } else {
           bN++;
-          if (phase > 8 && i > 0 && coversCenter(i, j, 'N')) {
-            s -= Math.round((15 * phase) / 24);
+          if (phase > 8 && i > 0 && coversCenterMT(i, j, 'N')) {
+            s -= Math.round((25 * phase) / 24);
+          }
+          if (phase > 8 && i === 0 && (j === 1 || j === 6)) {
+            s += 25;
           }
         }
       } else if (false) { // structural alignment
@@ -2465,10 +2549,24 @@ function ev(b, c2){
   // Open e-file castling penalty
   if (phase > 8 && wP[4] === 0 && bP[4] === 0) {
     if (wK[0] === 7 && wK[1] === 4) {
-      s -= Math.round((70 * phase) / 24);
+      var wOpenEFileDanger = 150;
+      for (var r = 0; r < 8; r++) {
+        if (b[r][4] === 'r' || b[r][4] === 'q') {
+          wOpenEFileDanger += 100;
+          break;
+        }
+      }
+      s -= Math.round((wOpenEFileDanger * phase) / 24);
     }
     if (bK[0] === 0 && bK[1] === 4) {
-      s += Math.round((70 * phase) / 24);
+      var bOpenEFileDanger = 150;
+      for (var r = 0; r < 8; r++) {
+        if (b[r][4] === 'R' || b[r][4] === 'Q') {
+          bOpenEFileDanger += 100;
+          break;
+        }
+      }
+      s += Math.round((bOpenEFileDanger * phase) / 24);
     }
   }
   
@@ -2720,14 +2818,7 @@ var val=ev(b,c2);
 if(mx){
 if(val>=bt)return val;
 if(val>al)al=val;
-var mvs=aLeg(b,'w',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){
-if(m.cap)return true;
-if(qdepth < 3 && checksCount > 0){
-appM(b,m);var gc=iCk(b,'b');undMv(b,m);
-return gc;
-}
-return false;
-});
+var mvs=aLegCaps(b,'w',E,true,qdepth,checksCount,c2);
 ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
 appM(b,mvs[i]);var s=qsh(b,al,bt,false,c2,qdepth+1,checksCount);undMv(b,mvs[i]);
@@ -2738,14 +2829,7 @@ return al;
 }else{
 if(val<=al)return val;
 if(val<bt)bt=val;
-var mvs=aLeg(b,'b',{wk:0,wq:0,bk:0,bq:0},E).filter(function(m){
-if(m.cap)return true;
-if(qdepth < 3 && checksCount > 0){
-appM(b,m);var gc=iCk(b,'w');undMv(b,m);
-return gc;
-}
-return false;
-});
+var mvs=aLegCaps(b,'b',E,true,qdepth,checksCount,c2);
 ordMT(b,mvs);
 for(var i=0;i<mvs.length;i++){
 appM(b,mvs[i]);var s=qsh(b,al,bt,true,c2,qdepth+1,checksCount);undMv(b,mvs[i]);
