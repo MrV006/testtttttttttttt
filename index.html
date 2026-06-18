@@ -22,6 +22,11 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 
 /* Game layout - strict height control */
 #gameS{padding:2px 0;gap:0}
+.gt-bar{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;max-width:560px;padding:1px 4px;margin:2px 4px;height:24px;flex-shrink:0;overflow:hidden}
+.gt-bar span{font-size:.65rem;color:#8b949e;white-space:nowrap;margin-left:3px}
+.gt-bar button{padding:2px 5px;border:1px solid #30363d;background:rgba(22,27,34,.7);color:#dfdfdf;border-radius:4px;cursor:pointer;font-size:.65rem;white-space:nowrap;line-height:1}
+.gt-bar button.on{background:rgba(88,166,255,.1);border-color:#58a6ff;color:#58a6ff}
+.gt-bar button:hover:not(.on){border-color:#58a6ff;background:#30363d}
 .bar{display:flex;justify-content:center;align-items:center;width:100%;padding:2px 4px;flex-wrap:nowrap;gap:3px;flex-shrink:0;height:28px;overflow:hidden}
 .bar button{padding:3px 7px;border:1px solid #30363d;background:rgba(22,27,34,.9);color:#e6edf3;border-radius:4px;cursor:pointer;font-size:clamp(.6rem,1.5vw,.72rem);white-space:nowrap;line-height:1.2}
 .bar button:hover{background:#30363d;border-color:#58a6ff}
@@ -116,12 +121,18 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 <h1>♟ شطرنج هوشمند</h1>
 <p class="sub">بازی و آموزش با هوش مصنوعی</p>
 <div class="dr" id="diffR"></div>
+<div class="dr" id="timeR" style="margin-top:-6px; margin-bottom:14px; display:flex; align-items:center; justify-content:center; gap:6px;">
+  <span style="font-size:.8rem; color:#8b949e; margin-left:4px;">زمان تفکر:</span>
+</div>
 <button class="mb" id="btnW">♔ بازی با سفید</button>
 <button class="mb" id="btnB">♚ بازی با سیاه</button>
 <button class="mb g" id="btnL">📚 آموزش شطرنج</button>
 </div>
 <div id="gameS" class="scr">
 <div class="bar" id="gbar"></div>
+<div class="gt-bar" id="timeRGame">
+  <span>⏱️ زمان فکر:</span>
+</div>
 <div class="pi" id="ti"><span>🤖</span><span id="tn">AI</span><span class="cp" id="tc"></span></div>
 <div id="sts"></div>
 <div id="bwrap"><div id="brd"></div></div>
@@ -286,7 +297,7 @@ var ON={
   'd2d4.g8f6.c2c4.e7e6.b1c3.f8b4': 'دفاع نیمزو-هندی',
   'd2d4.g8f6.c2c4.e7e6.g1f3.b7b6': 'دفاع هندی وزیر'
 };
-var bd,tn,sel,pms,ov,cas,epq,lmv,cW,cB,df=2,PC='w',fl=false,aOn=false,hs=[],GR=[],mn=0,oNm='',rvI=0;
+var bd,tn,sel,pms,ov,cas,epq,lmv,cW,cB,df=2,PC='w',fl=false,aOn=false,hs=[],GR=[],mn=0,oNm='',rvI=0,userTimeLimit='default';
 var boardSize=300;
 var sfx={move:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3'),capture:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3'),check:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-check.mp3'),end:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-end.mp3'),start:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-start.mp3')};
 function playSound(t){if(sfx[t]){sfx[t].currentTime=0;sfx[t].play().catch(function(){})}}
@@ -353,6 +364,9 @@ function ev(b, c2){ // WK_EV_FUNC
     var targets = [[3,3], [3,4], [4,3], [4,4]];
     for (var k=0; k<4; k++) {
       var tr = targets[k][0], tc = targets[k][1];
+      if (r === tr && c === tc) {
+        return true;
+      }
       if (tPiece === 'N') {
         if (Math.abs(r - tr) * Math.abs(c - tc) === 2) {
           return true;
@@ -364,7 +378,11 @@ function ev(b, c2){ // WK_EV_FUNC
           var nr = r + dr, nc = c + dc;
           var blocked = false;
           while (nr !== tr && nc !== tc) {
-            if (b[nr][nc]) { blocked = true; break; }
+            if (nr < 0 || nr > 7 || nc < 0 || nc > 7) {
+              blocked = true;
+              break;
+            }
+            if (b[nr] && b[nr][nc]) { blocked = true; break; }
             nr += dr; nc += dc;
           }
           if (!blocked) return true;
@@ -1521,7 +1539,7 @@ function show(id){if(id==='menuS'){terminateWorker();aOn=false}document.querySel
 
 function calcBoard(){
 var vh=window.innerHeight;
-var fixedH=28+24+20+24+18+4+8;// bar+pi+sts+pi+ml+gaps+border
+var fixedH=28+24+24+20+24+18+4+8;// bar+timeRGame+pi+sts+pi+ml+gaps+border
 var apEl=document.getElementById('ap');
 var apH=apEl.childElementCount>0?Math.min(apEl.scrollHeight,70):0;
 fixedH+=apH;
@@ -1542,6 +1560,21 @@ var dr=document.getElementById('diffR');
 [['مبتدی🟢',1],['متوسط🟡',2],['پیشرفته🟠',3],['حرفه‌ای🔴',4]].forEach(function(x){
 var b=document.createElement('button');b.className='db'+(x[1]===2?' on':'');b.textContent=x[0];
 b.onclick=function(){dr.querySelectorAll('.db').forEach(function(d){d.classList.remove('on')});this.classList.add('on');df=x[1]};dr.appendChild(b);});
+window.syncTimeLimitButtons = function(val) {
+  userTimeLimit = val;
+  document.querySelectorAll('#timeR .db, #timeRGame .db').forEach(function(d){
+    d.classList.toggle('on', d.getAttribute('data-time') === String(val));
+  });
+};
+var tr=document.getElementById('timeR');
+var trg=document.getElementById('timeRGame');
+[['پیش‌فرض', 'default'], ['۰.۵ ثانیه', 500], ['۱ ثانیه', 1000], ['۲ ثانیه', 2000], ['۵ ثانیه', 5000], ['۱۰ ثانیه', 10000]].forEach(function(x){
+  var b=document.createElement('button');b.className='db'+(x[1]==='default'?' on':'');b.textContent=x[0];b.setAttribute('data-time', String(x[1]));
+  b.onclick=function(){syncTimeLimitButtons(x[1])};tr.appendChild(b);
+
+  var bg=document.createElement('button');bg.className='db'+(x[1]==='default'?' on':'');bg.textContent=x[0];bg.setAttribute('data-time', String(x[1]));
+  bg.onclick=function(){syncTimeLimitButtons(x[1])};trg.appendChild(bg);
+});
 document.getElementById('btnW').onclick=function(){startG('w')};
 document.getElementById('btnB').onclick=function(){startG('b')};
 document.getElementById('btnL').onclick=function(){show('learnS');initL()};
@@ -1823,6 +1856,9 @@ function ev(b, c2){
     var targets = [[3,3], [3,4], [4,3], [4,4]];
     for (var k=0; k<4; k++) {
       var tr = targets[k][0], tc = targets[k][1];
+      if (r === tr && c === tc) {
+        return true;
+      }
       if (tPiece === 'N') {
         if (Math.abs(r - tr) * Math.abs(c - tc) === 2) {
           return true;
@@ -1834,7 +1870,11 @@ function ev(b, c2){
           var nr = r + dr, nc = c + dc;
           var blocked = false;
           while (nr !== tr && nc !== tc) {
-            if (b[nr][nc]) { blocked = true; break; }
+            if (nr < 0 || nr > 7 || nc < 0 || nc > 7) {
+              blocked = true;
+              break;
+            }
+            if (b[nr] && b[nr][nc]) { blocked = true; break; }
             nr += dr; nc += dc;
           }
           if (!blocked) return true;
@@ -2976,6 +3016,10 @@ function aiTn(){
           d2 += 2;
           timeLimit *= 2;
         }
+
+        if (userTimeLimit !== 'default') {
+          timeLimit = userTimeLimit;
+        }
         
         var pcCount=0;
         for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c])pcCount++;
@@ -3031,7 +3075,7 @@ function aiTn(){
   },60);
 }
 
-function getHint(){if(ov||tn!==PC||aOn)return;addA('<span class="pu">💡تحلیل...</span>',false,-1);setTimeout(function(){try{var mx=PC==='w',d=Math.min(df+1,5);terminateWorker();var worker=getWorker();var curWorkerMvId=Date.now();worker.onmessage=function(e){if(e.data.type==='result'&&e.data.id===curWorkerMvId){var res=e.data.res;if(res.move){var m=res.move;var p=bd[m.fr][m.fc];var ap=document.getElementById('ap');if(ap.lastElementChild)ap.lastElementChild.innerHTML='💡 '+(PF[ty(p)]||'')+' '+s2a(m.fr,m.fc)+'→'+s2a(m.tr,m.tc);sel=[m.fr,m.fc];pms=[m];ren();var cells=document.getElementById('brd').children;for(var ci=0;ci<cells.length;ci++){var di=Math.floor(ci/8),dj=ci%8;var r2=fl?7-di:di,c2=fl?7-dj:dj;if((r2===m.fr&&c2===m.fc)||(r2===m.tr&&c2===m.tc))cells[ci].classList.add('hn')}setTimeout(function(){sel=E;pms=[];ren()},3000)}}};worker.postMessage({type:'minimax',id:curWorkerMvId,bd:cln(bd),d:d,al:-1e9,bt:1e9,mx:mx,c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},eps:epq,gameHashes:GR.map(function(g){return getHashMT(g.bd,g.tn==='w',g.cas,g.ep)})})}catch(e){}},50)}
+function getHint(){if(ov||tn!==PC||aOn)return;addA('<span class="pu">💡تحلیل...</span>',false,-1);setTimeout(function(){try{var mx=PC==='w',d=Math.min(df+1,5);terminateWorker();var worker=getWorker();var curWorkerMvId=Date.now();worker.onmessage=function(e){if(e.data.type==='result'&&e.data.id===curWorkerMvId){var res=e.data.res;if(res.move){var m=res.move;var p=bd[m.fr][m.fc];var ap=document.getElementById('ap');if(ap.lastElementChild)ap.lastElementChild.innerHTML='💡 '+(PF[ty(p)]||'')+' '+s2a(m.fr,m.fc)+'→'+s2a(m.tr,m.tc);sel=[m.fr,m.fc];pms=[m];ren();var cells=document.getElementById('brd').children;for(var ci=0;ci<cells.length;ci++){var di=Math.floor(ci/8),dj=ci%8;var r2=fl?7-di:di,c2=fl?7-dj:dj;if((r2===m.fr&&c2===m.fc)||(r2===m.tr&&c2===m.tc))cells[ci].classList.add('hn')}setTimeout(function(){sel=E;pms=[];ren()},3000)}}};worker.postMessage({type:'minimax',id:curWorkerMvId,bd:cln(bd),d:d,al:-1e9,bt:1e9,mx:mx,c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},eps:epq,timeLimit:userTimeLimit==='default'?2500:userTimeLimit,gameHashes:GR.map(function(g){return getHashMT(g.bd,g.tn==='w',g.cas,g.ep)})})}catch(e){}},50)}
 
 function undoM(){terminateWorker();if(aOn){aOn=false;if(hs.length>0){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}else{if(hs.length<2)return;for(var i=0;i<2&&hs.length>0;i++){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}while(GR.length>mn+1)GR.pop();ov=false;sel=E;pms=[];ren();upSt()}
 function endAn(){var pM=GR.filter(function(g){return g.ip&&g.ac>=0});if(!pM.length)return;var avg=Math.round(pM.reduce(function(s,g){return s+g.ac},0)/pM.length);addA('📊 دقت: '+avg+'% — 🔍بازبینی کنید',false,-1)}
