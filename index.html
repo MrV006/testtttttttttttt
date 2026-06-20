@@ -642,11 +642,22 @@ function ev(b, c2){ // WK_EV_FUNC
               }
             }
             if (attackedByPawn && t2 !== 'P') {
-              s += (c === 'w' ? -150 : 150);
+              var pawnAttPenalty = 150;
+              if (t2 === 'Q') pawnAttPenalty = 550;
+              else if (t2 === 'R') pawnAttPenalty = 350;
+              else if (t2 === 'B' || t2 === 'N') pawnAttPenalty = 220;
+              s += (c === 'w' ? -pawnAttPenalty : pawnAttPenalty);
             } else {
               var leastAttacker = getLeastValuableAttacker(b, i, j, by);
               if (leastAttacker && leastAttacker.val < v) {
-                s += (c === 'w' ? -100 : 100);
+                var minorThreatPenalty = 100;
+                if (t2 === 'Q') {
+                  if (leastAttacker.val <= 330) minorThreatPenalty = 350; // Q threatened by N or B
+                  else if (leastAttacker.val <= 500) minorThreatPenalty = 250; // Q threatened by Rook
+                } else if (t2 === 'R') {
+                  if (leastAttacker.val <= 330) minorThreatPenalty = 200; // Rook threatened by Knight or Bishop
+                }
+                s += (c === 'w' ? -minorThreatPenalty : minorThreatPenalty);
               }
             }
           }
@@ -759,8 +770,15 @@ function ev(b, c2){ // WK_EV_FUNC
     }
   }
   
-  if(wB>=2) s+=30;
-  if(bB>=2) s-=30;
+  var totalPawns = 0;
+  for (var f = 0; f < 8; f++) {
+    totalPawns += wP[f] + bP[f];
+  }
+  var openness = Math.max(0, 16 - totalPawns);
+  var extraBishopPairBonus = Math.round((openness * 7) * (phase / 24));
+  
+  if (wB >= 2) s += (30 + extraBishopPairBonus);
+  if (bB >= 2) s -= (30 + extraBishopPairBonus);
  
   // Major-Minor Imbalance Guard (Queen vs Rook + Minor Piece)
   if (wQ > 0 && bQ === 0) {
@@ -1078,6 +1096,47 @@ function ev(b, c2){ // WK_EV_FUNC
     if (bK[0] === 1 && bK[1] === 5 && wHasQueen) s += 80;
     if (wK[0] <= 6 && wK[0] >= 3 && bHasQueen) s -= 60;
     if (bK[0] >= 1 && bK[0] <= 4 && wHasQueen) s += 60;
+  }
+
+  // King ring threat evaluation (squares around castled king)
+  if (phase > 8) {
+    var wKRingAttacks = 0;
+    if (wK[0] !== -1 && (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2))) {
+      var kr = wK[0], kc = wK[1];
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = kr + dr, nc = kc + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            if (sAt(b, nr, nc, 'b')) {
+              wKRingAttacks++;
+            }
+          }
+        }
+      }
+      if (wKRingAttacks > 0) {
+        s -= wKRingAttacks * 25;
+      }
+    }
+    
+    var bKRingAttacks = 0;
+    if (bK[0] !== -1 && (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2))) {
+      var kr = bK[0], kc = bK[1];
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = kr + dr, nc = kc + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            if (sAt(b, nr, nc, 'w')) {
+              bKRingAttacks++;
+            }
+          }
+        }
+      }
+      if (bKRingAttacks > 0) {
+        s += bKRingAttacks * 25;
+      }
+    }
   }
   
   return s;
@@ -1583,7 +1642,40 @@ self.onmessage=function(e){
       bestResult = res;
       
       var elapsed = Date.now() - globalStartTime;
-      var threshold = globalTimeLimit * (maxDepth >= 8 ? 0.60 : (maxDepth <= 4 ? 0.80 : 0.70));
+      var activeColor = d.mx ? 'w' : 'b';
+      var oppColor = d.mx ? 'b' : 'w';
+      var isDangerous = iCk(d.bd, activeColor);
+      
+      if (!isDangerous) {
+        for (var pi = 0; pi < 8; pi++) {
+          for (var pj = 0; pj < 8; pj++) {
+            var pc = d.bd[pi][pj];
+            if (pc && co(pc) === activeColor) {
+              var pt = ty(pc);
+              if (pt === 'Q' || pt === 'R') {
+                if (sAt(d.bd, pi, pj, oppColor)) {
+                  isDangerous = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (isDangerous) break;
+        }
+      }
+      
+      if (!isDangerous && bestResult && bestResult.s !== undefined) {
+        var scoreVal = bestResult.s;
+        if ((d.mx && scoreVal < -120) || (!d.mx && scoreVal > 120)) {
+          isDangerous = true;
+        }
+      }
+      
+      var basePct = (maxDepth >= 8 ? 0.60 : (maxDepth <= 4 ? 0.80 : 0.70));
+      if (isDangerous) {
+        basePct = Math.max(basePct, 0.92);
+      }
+      var threshold = globalTimeLimit * basePct;
       if(elapsed > threshold){
         break;
       }
@@ -2251,11 +2343,22 @@ function ev(b, c2){ // MAIN_THREAD_EV
               }
             }
             if (attackedByPawn && t2 !== 'P') {
-              s += (c === 'w' ? -150 : 150);
+              var pawnAttPenalty = 150;
+              if (t2 === 'Q') pawnAttPenalty = 550;
+              else if (t2 === 'R') pawnAttPenalty = 350;
+              else if (t2 === 'B' || t2 === 'N') pawnAttPenalty = 220;
+              s += (c === 'w' ? -pawnAttPenalty : pawnAttPenalty);
             } else {
               var leastAttacker = getLeastValuableAttacker(b, i, j, by);
               if (leastAttacker && leastAttacker.val < v) {
-                s += (c === 'w' ? -100 : 100);
+                var minorThreatPenalty = 100;
+                if (t2 === 'Q') {
+                  if (leastAttacker.val <= 330) minorThreatPenalty = 350; // Q threatened by N or B
+                  else if (leastAttacker.val <= 500) minorThreatPenalty = 250; // Q threatened by Rook
+                } else if (t2 === 'R') {
+                  if (leastAttacker.val <= 330) minorThreatPenalty = 200; // Rook threatened by Knight or Bishop
+                }
+                s += (c === 'w' ? -minorThreatPenalty : minorThreatPenalty);
               }
             }
           }
@@ -2368,8 +2471,15 @@ function ev(b, c2){ // MAIN_THREAD_EV
     }
   }
   
-  if(wB>=2) s+=30;
-  if(bB>=2) s-=30;
+  var totalPawns = 0;
+  for (var f = 0; f < 8; f++) {
+    totalPawns += wP[f] + bP[f];
+  }
+  var openness = Math.max(0, 16 - totalPawns);
+  var extraBishopPairBonus = Math.round((openness * 7) * (phase / 24));
+  
+  if (wB >= 2) s += (30 + extraBishopPairBonus);
+  if (bB >= 2) s -= (30 + extraBishopPairBonus);
  
   // Major-Minor Imbalance Guard (Queen vs Rook + Minor Piece)
   if (wQ > 0 && bQ === 0) {
@@ -2687,6 +2797,47 @@ function ev(b, c2){ // MAIN_THREAD_EV
     if (bK[0] === 1 && bK[1] === 5 && wHasQueen) s += 80;
     if (wK[0] <= 6 && wK[0] >= 3 && bHasQueen) s -= 60;
     if (bK[0] >= 1 && bK[0] <= 4 && wHasQueen) s += 60;
+  }
+
+  // King ring threat evaluation (squares around castled king)
+  if (phase > 8) {
+    var wKRingAttacks = 0;
+    if (wK[0] !== -1 && (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2))) {
+      var kr = wK[0], kc = wK[1];
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = kr + dr, nc = kc + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            if (sAt(b, nr, nc, 'b')) {
+              wKRingAttacks++;
+            }
+          }
+        }
+      }
+      if (wKRingAttacks > 0) {
+        s -= wKRingAttacks * 25;
+      }
+    }
+    
+    var bKRingAttacks = 0;
+    if (bK[0] !== -1 && (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2))) {
+      var kr = bK[0], kc = bK[1];
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = kr + dr, nc = kc + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            if (sAt(b, nr, nc, 'w')) {
+              bKRingAttacks++;
+            }
+          }
+        }
+      }
+      if (bKRingAttacks > 0) {
+        s += bKRingAttacks * 25;
+      }
+    }
   }
   
   return s;
