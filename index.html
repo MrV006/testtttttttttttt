@@ -311,7 +311,7 @@ var boardSize=300;
 var sfx={move:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3'),capture:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3'),check:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-check.mp3'),end:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-end.mp3'),start:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-start.mp3')};
 function playSound(t){if(sfx[t]){sfx[t].currentTime=0;sfx[t].play().catch(function(){})}}
 
-var workerBlobUrl=null,aiWorker=null;
+var workerBlobUrl=null,aiWorker=null,aiWorkerSearching=false,lastAiPonderMove=null,isPondering=false,ponderMoveApplied=null;
 var WORKER_CODE=`// --- WORKER ENGINE CORE ---
 var E=null;
 var TT={};
@@ -1688,7 +1688,9 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
 self.onmessage=function(e){
   var d=e.data;
   if(d.type==='minimax'){
-    TT={};
+    if (d.clearTT !== false || Object.keys(TT).length > 150000) {
+      TT={};
+    }
     killerMoves={};
     searchPly=0;
     for(var i=0;i<4096;i++)historyTable[i]=0;
@@ -1774,6 +1776,21 @@ self.onmessage=function(e){
     }
     
     var finalDepth = bestResult ? (bestResult.move ? (bestResult.s !== undefined ? (Math.min(maxDepth, Math.max(1, currentDepth - 1))) : 1) : 1) : 1;
+    var ponderMove = null;
+    if (bestResult && bestResult.move) {
+      try {
+        var pbd = cln(d.bd);
+        var pmv = bestResult.move;
+        appM(pbd, pmv);
+        var pc2 = {wk: d.c2.wk, wq: d.c2.wq, bk: d.c2.bk, bq: d.c2.bq};
+        uCRc(pc2, pmv);
+        var peps = pmv.epc || E;
+        var ph = getHash(pbd, !d.mx, pc2, peps);
+        if (TT[ph] && TT[ph].move) {
+          ponderMove = TT[ph].move;
+        }
+      } catch (e) {}
+    }
     self.postMessage({
       type: 'result',
       id: d.id,
@@ -1781,7 +1798,8 @@ self.onmessage=function(e){
         move: bestResult ? bestResult.move : null,
         s: bestResult ? bestResult.s : 0,
         depth: finalDepth,
-        elapsed: Date.now() - globalStartTime
+        elapsed: Date.now() - globalStartTime,
+        ponderMove: ponderMove
       }
     });
   }
@@ -1795,6 +1813,7 @@ function getWorker(){
       workerBlobUrl=URL.createObjectURL(blob);
     }
     aiWorker=new Worker(workerBlobUrl);
+    aiWorkerSearching=false;
   }
   return aiWorker;
 }
@@ -1804,6 +1823,9 @@ function terminateWorker(){
     aiWorker.terminate();
     aiWorker=null;
   }
+  aiWorkerSearching=false;
+  isPondering=false;
+  ponderMoveApplied=null;
 }
 
 function mkBd(){return[['r','n','b','q','k','b','n','r'],['p','p','p','p','p','p','p','p'],[E,E,E,E,E,E,E,E],[E,E,E,E,E,E,E,E],[E,E,E,E,E,E,E,E],[E,E,E,E,E,E,E,E],['P','P','P','P','P','P','P','P'],['R','N','B','Q','K','B','N','R']]}
@@ -3490,6 +3512,9 @@ aOn=false;
 sel=E;pms=[];
 ren();
 upSt();
+if (!ov && tn === PC) {
+  setTimeout(startPondering, 200);
+}
 }
 
 function aiTn(){
@@ -3559,13 +3584,34 @@ function aiTn(){
         for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c])pcCount++;
         if(pcCount<12)d2+=1; // Search deeper in endgame since branching factor is very low
         
-        terminateWorker();
+        var ponderHit = false;
+        if (isPondering && ponderMoveApplied && lmv) {
+          if (ponderMoveApplied.fr === lmv.fr && ponderMoveApplied.fc === lmv.fc &&
+              ponderMoveApplied.tr === lmv.tr && ponderMoveApplied.tc === lmv.tc) {
+            ponderHit = true;
+          }
+        }
+        isPondering = false;
+        
+        if (ponderHit) {
+          document.getElementById('sts').innerHTML='<span class="pu">⚡ AI (حدس درست! در حال بررسی عمیق‌تر...)</span>';
+        } else {
+          document.getElementById('sts').innerHTML='<span class="pu">🤔 AI...</span>';
+        }
+
+        if (aiWorkerSearching) {
+          terminateWorker();
+        }
         var worker=getWorker();
         var curWorkerMvId=Date.now();
+        aiWorkerSearching = true;
+        
         worker.onmessage=function(e){
           if(e.data.type==='result'&&e.data.id===curWorkerMvId){
+            aiWorkerSearching = false;
             var res=e.data.res;
             var best=res ? res.move : null;
+            lastAiPonderMove = res ? res.ponderMove : null;
             var rms2=aLeg(bd,aiC,cas,epq);
             var fd=E;
             if(best){
@@ -3587,7 +3633,7 @@ function aiTn(){
                 evalVal = -evalVal;
               }
               var evalText = (evalVal / 100).toFixed(2);
-              var depthText = "🎯 نوبت شما | 🧠 AI: عمق " + res.depth + "، ارزیابی: " + evalText + " (" + (res.elapsed / 1000).toFixed(2) + " ثانیه)";
+              var depthText = "🎯 نوبت شما | 🧠 AI: عمق " + res.depth + "، ارزیابی: " + evalText + " (" + (res.elapsed / 1000).toFixed(2) + " ثانیه)" + (ponderHit ? " [حدس درست ⚡]" : "");
               document.getElementById('sts').textContent = depthText;
             }
           }
@@ -3603,6 +3649,7 @@ function aiTn(){
           c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},
           eps:epq,
           timeLimit:timeLimit,
+          clearTT: !ponderHit,
           gameHashes: GR.map(function(g) {
             return getHashMT(g.bd, g.tn === 'w', g.cas, g.ep);
           })
@@ -3616,6 +3663,78 @@ function aiTn(){
       upSt();
     }
   },60);
+}
+
+function startPondering() {
+  if (ov || tn !== PC || aOn || !lastAiPonderMove) return;
+  
+  // Verify that lastAiPonderMove is a legal move
+  var legMvs = aLeg(bd, tn, cas, epq);
+  var validMove = null;
+  for (var i = 0; i < legMvs.length; i++) {
+    var m = legMvs[i];
+    if (m.fr === lastAiPonderMove.fr && m.fc === lastAiPonderMove.fc && m.tr === lastAiPonderMove.tr && m.tc === lastAiPonderMove.tc) {
+      validMove = m;
+      break;
+    }
+  }
+  
+  if (!validMove) return;
+  
+  // Apply validMove to get the pondered board state
+  var pBd = cln(bd);
+  appM(pBd, validMove);
+  var pCas = {wk: cas.wk, wq: cas.wq, bk: cas.bk, bq: cas.bq};
+  uCRc(pCas, validMove);
+  var pEpq = validMove.epc || E;
+  
+  var aiC = PC === 'w' ? 'b' : 'w';
+  var mx = aiC === 'w';
+  
+  isPondering = true;
+  ponderMoveApplied = validMove;
+  
+  var d2 = [3, 4, 6, 8][Math.min(df-1, 3)];
+  var timeLimit = 30000; // 30 seconds of background pondering
+  
+  if (aiWorkerSearching) {
+    terminateWorker();
+  }
+  
+  var worker = getWorker();
+  var curWorkerMvId = Date.now();
+  aiWorkerSearching = true;
+  
+  if (document.getElementById('sts')) {
+    var originalSts = document.getElementById('sts').textContent;
+    if (!originalSts.includes('🧠')) {
+      document.getElementById('sts').textContent = originalSts + ' | 🧠 AI در حال پیش‌بینی حرکت شما...';
+    }
+  }
+  
+  worker.onmessage = function(e) {
+    if (e.data.type === 'result' && e.data.id === curWorkerMvId) {
+      aiWorkerSearching = false;
+      // Pondering completed. Transposition Table (TT) is fully loaded!
+    }
+  };
+  
+  worker.postMessage({
+    type: 'minimax',
+    id: curWorkerMvId,
+    bd: pBd,
+    d: d2 + 1, // Search 1 depth deeper during pondering
+    al: -1e9,
+    bt: 1e9,
+    mx: mx,
+    c2: pCas,
+    eps: pEpq,
+    timeLimit: timeLimit,
+    clearTT: false, // DO NOT clear transposition table!
+    gameHashes: GR.map(function(g) {
+      return getHashMT(g.bd, g.tn === 'w', g.cas, g.ep);
+    })
+  });
 }
 
 function getHint(){if(ov||tn!==PC||aOn)return;addA('<span class="pu">💡تحلیل...</span>',false,-1);setTimeout(function(){try{var mx=PC==='w',d=Math.min(df+1,5);terminateWorker();var worker=getWorker();var curWorkerMvId=Date.now();worker.onmessage=function(e){if(e.data.type==='result'&&e.data.id===curWorkerMvId){var res=e.data.res;if(res.move){var m=res.move;var p=bd[m.fr][m.fc];var ap=document.getElementById('ap');if(ap.lastElementChild)ap.lastElementChild.innerHTML='💡 '+(PF[ty(p)]||'')+' '+s2a(m.fr,m.fc)+'→'+s2a(m.tr,m.tc);sel=[m.fr,m.fc];pms=[m];ren();var cells=document.getElementById('brd').children;for(var ci=0;ci<cells.length;ci++){var di=Math.floor(ci/8),dj=ci%8;var r2=fl?7-di:di,c2=fl?7-dj:dj;if((r2===m.fr&&c2===m.fc)||(r2===m.tr&&c2===m.tc))cells[ci].classList.add('hn')}setTimeout(function(){sel=E;pms=[];ren()},3000)}}};worker.postMessage({type:'minimax',id:curWorkerMvId,bd:cln(bd),d:d,al:-1e9,bt:1e9,mx:mx,c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},eps:epq,timeLimit:userTimeLimit==='default'?2500:userTimeLimit,gameHashes:GR.map(function(g){return getHashMT(g.bd,g.tn==='w',g.cas,g.ep)})})}catch(e){}},50)}
