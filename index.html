@@ -316,6 +316,7 @@ var WORKER_CODE=`// --- WORKER ENGINE CORE ---
 var E=null;
 var TT={};
 var searchPly=0;
+var globalAbortArray=null;
 function getHash(b,mx,c2,eps){ // WK_HASH
   var s=mx?'w':'b';
   s+=c2.wk+''+c2.wq+''+c2.bk+''+c2.bq;
@@ -1508,7 +1509,9 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
   var origBeta = bt;
   nodeCount++;
   if(nodeCount % 1024 === 0) {
-    if(Date.now() - globalStartTime >= globalTimeLimit) {
+    if(globalAbortArray && globalAbortArray[0] === 1) {
+      globalAborted = true;
+    } else if(Date.now() - globalStartTime >= globalTimeLimit) {
       globalAborted = true;
     }
   }
@@ -1688,6 +1691,7 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
 self.onmessage=function(e){
   var d=e.data;
   if(d.type==='minimax'){
+    globalAbortArray = d.abortBuffer ? new Int32Array(d.abortBuffer) : null;
     if (d.clearTT !== false || Object.keys(TT).length > 150000) {
       TT={};
     }
@@ -1806,6 +1810,9 @@ self.onmessage=function(e){
 };
 `;
 
+var abortBuffer = typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(4) : null;
+var abortArray = abortBuffer ? new Int32Array(abortBuffer) : null;
+
 function getWorker(){
   if(!aiWorker){
     if(!workerBlobUrl){
@@ -1816,6 +1823,15 @@ function getWorker(){
     aiWorkerSearching=false;
   }
   return aiWorker;
+}
+
+function abortWorkerSearch(){
+  if(abortArray){
+    abortArray[0] = 1;
+  } else {
+    terminateWorker();
+  }
+  aiWorkerSearching=false;
 }
 
 function terminateWorker(){
@@ -3600,7 +3616,10 @@ function aiTn(){
         }
 
         if (aiWorkerSearching) {
-          terminateWorker();
+          abortWorkerSearch();
+        }
+        if (abortArray) {
+          abortArray[0] = 0; // reset abort flag
         }
         var worker=getWorker();
         var curWorkerMvId=Date.now();
@@ -3650,6 +3669,7 @@ function aiTn(){
           eps:epq,
           timeLimit:timeLimit,
           clearTT: !ponderHit,
+          abortBuffer: abortBuffer,
           gameHashes: GR.map(function(g) {
             return getHashMT(g.bd, g.tn === 'w', g.cas, g.ep);
           })
@@ -3698,7 +3718,10 @@ function startPondering() {
   var timeLimit = 30000; // 30 seconds of background pondering
   
   if (aiWorkerSearching) {
-    terminateWorker();
+    abortWorkerSearch();
+  }
+  if (abortArray) {
+    abortArray[0] = 0; // Reset abort flag
   }
   
   var worker = getWorker();
@@ -3731,13 +3754,14 @@ function startPondering() {
     eps: pEpq,
     timeLimit: timeLimit,
     clearTT: false, // DO NOT clear transposition table!
+    abortBuffer: abortBuffer,
     gameHashes: GR.map(function(g) {
       return getHashMT(g.bd, g.tn === 'w', g.cas, g.ep);
     })
   });
 }
 
-function getHint(){if(ov||tn!==PC||aOn)return;addA('<span class="pu">💡تحلیل...</span>',false,-1);setTimeout(function(){try{var mx=PC==='w',d=Math.min(df+1,5);terminateWorker();var worker=getWorker();var curWorkerMvId=Date.now();worker.onmessage=function(e){if(e.data.type==='result'&&e.data.id===curWorkerMvId){var res=e.data.res;if(res.move){var m=res.move;var p=bd[m.fr][m.fc];var ap=document.getElementById('ap');if(ap.lastElementChild)ap.lastElementChild.innerHTML='💡 '+(PF[ty(p)]||'')+' '+s2a(m.fr,m.fc)+'→'+s2a(m.tr,m.tc);sel=[m.fr,m.fc];pms=[m];ren();var cells=document.getElementById('brd').children;for(var ci=0;ci<cells.length;ci++){var di=Math.floor(ci/8),dj=ci%8;var r2=fl?7-di:di,c2=fl?7-dj:dj;if((r2===m.fr&&c2===m.fc)||(r2===m.tr&&c2===m.tc))cells[ci].classList.add('hn')}setTimeout(function(){sel=E;pms=[];ren()},3000)}}};worker.postMessage({type:'minimax',id:curWorkerMvId,bd:cln(bd),d:d,al:-1e9,bt:1e9,mx:mx,c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},eps:epq,timeLimit:userTimeLimit==='default'?2500:userTimeLimit,gameHashes:GR.map(function(g){return getHashMT(g.bd,g.tn==='w',g.cas,g.ep)})})}catch(e){}},50)}
+function getHint(){if(ov||tn!==PC||aOn)return;addA('<span class="pu">💡تحلیل...</span>',false,-1);setTimeout(function(){try{var mx=PC==='w',d=Math.min(df+1,5);if(aiWorkerSearching){abortWorkerSearch()}if(abortArray){abortArray[0]=0}var worker=getWorker();var curWorkerMvId=Date.now();worker.onmessage=function(e){if(e.data.type==='result'&&e.data.id===curWorkerMvId){var res=e.data.res;if(res.move){var m=res.move;var p=bd[m.fr][m.fc];var ap=document.getElementById('ap');if(ap.lastElementChild)ap.lastElementChild.innerHTML='💡 '+(PF[ty(p)]||'')+' '+s2a(m.fr,m.fc)+'→'+s2a(m.tr,m.tc);sel=[m.fr,m.fc];pms=[m];ren();var cells=document.getElementById('brd').children;for(var ci=0;ci<cells.length;ci++){var di=Math.floor(ci/8),dj=ci%8;var r2=fl?7-di:di,c2=fl?7-dj:dj;if((r2===m.fr&&c2===m.fc)||(r2===m.tr&&c2===m.tc))cells[ci].classList.add('hn')}setTimeout(function(){sel=E;pms=[];ren()},3000)}}};worker.postMessage({type:'minimax',id:curWorkerMvId,bd:cln(bd),d:d,al:-1e9,bt:1e9,mx:mx,c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},eps:epq,timeLimit:userTimeLimit==='default'?2500:userTimeLimit,abortBuffer:abortBuffer,gameHashes:GR.map(function(g){return getHashMT(g.bd,g.tn==='w',g.cas,g.ep)})})}catch(e){}},50)}
 
 function undoM(){terminateWorker();if(aOn){aOn=false;if(hs.length>0){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}else{if(hs.length<2)return;for(var i=0;i<2&&hs.length>0;i++){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}while(GR.length>mn+1)GR.pop();ov=false;sel=E;pms=[];ren();upSt()}
 function endAn(){var pM=GR.filter(function(g){return g.ip&&g.ac>=0});if(!pM.length)return;var avg=Math.round(pM.reduce(function(s,g){return s+g.ac},0)/pM.length);addA('📊 دقت: '+avg+'% — 🔍بازبینی کنید',false,-1)}
