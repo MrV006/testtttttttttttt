@@ -1101,7 +1101,7 @@ function ev(b, c2){ // WK_EV_FUNC
   // King ring threat evaluation (squares around castled king)
   if (phase > 8) {
     var wKRingAttacks = 0;
-    if (wK[0] !== -1 && (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2))) {
+    if (wK[0] !== -1 && (wK[0] === 7 && (wK[1] <= 2 || wK[1] >= 5))) {
       var kr = wK[0], kc = wK[1];
       for (var dr = -1; dr <= 1; dr++) {
         for (var dc = -1; dc <= 1; dc++) {
@@ -1120,7 +1120,7 @@ function ev(b, c2){ // WK_EV_FUNC
     }
     
     var bKRingAttacks = 0;
-    if (bK[0] !== -1 && (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2))) {
+    if (bK[0] !== -1 && (bK[0] === 0 && (bK[1] <= 2 || bK[1] >= 5))) {
       var kr = bK[0], kc = bK[1];
       for (var dr = -1; dr <= 1; dr++) {
         for (var dc = -1; dc <= 1; dc++) {
@@ -1135,6 +1135,52 @@ function ev(b, c2){ // WK_EV_FUNC
       }
       if (bKRingAttacks > 0) {
         s += bKRingAttacks * 25;
+      }
+    }
+  }
+
+  // King mobility and trapped king evaluation
+  if (phase > 4) {
+    if (wK[0] !== -1) {
+      var wSafeSquares = 0;
+      var kr = wK[0], kc = wK[1];
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = kr + dr, nc = kc + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            var targetPiece = b[nr][nc];
+            if ((!targetPiece || co(targetPiece) === 'b') && !sAt(b, nr, nc, 'b')) {
+              wSafeSquares++;
+            }
+          }
+        }
+      }
+      if (wSafeSquares === 0 && (bR > 0 || bQ > 0)) {
+        s -= 250;
+      } else if (wSafeSquares === 1 && (bR > 0 || bQ > 0)) {
+        s -= 100;
+      }
+    }
+    if (bK[0] !== -1) {
+      var bSafeSquares = 0;
+      var kr = bK[0], kc = bK[1];
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = kr + dr, nc = kc + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            var targetPiece = b[nr][nc];
+            if ((!targetPiece || co(targetPiece) === 'w') && !sAt(b, nr, nc, 'w')) {
+              bSafeSquares++;
+            }
+          }
+        }
+      }
+      if (bSafeSquares === 0 && (wR > 0 || wQ > 0)) {
+        s += 250;
+      } else if (bSafeSquares === 1 && (wR > 0 || wQ > 0)) {
+        s += 100;
       }
     }
   }
@@ -1410,6 +1456,27 @@ var searchPath = [];
 
 function hasMat(b,col){var tCol=col==='w';for(var r=0;r<8;r++)for(var c=0;c<8;c++){var p=b[r][c];if(p&&ty(p)!=='K'&&ty(p)!=='P'&&((p===p.toUpperCase())===tCol))return true}return false}
 
+function getKingMobility(b, col) {
+  var kp = fK(b, col);
+  if (!kp) return 8;
+  var kr = kp[0], kc = kp[1];
+  var opp = col === 'w' ? 'b' : 'w';
+  var safe = 0;
+  for (var dr = -1; dr <= 1; dr++) {
+    for (var dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      var nr = kr + dr, nc = kc + dc;
+      if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+        var p = b[nr][nc];
+        if ((!p || co(p) === opp) && !sAt(b, nr, nc, opp)) {
+          safe++;
+        }
+      }
+    }
+  }
+  return safe;
+}
+
 function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
   var h = getHash(b,mx,c2,eps);
   var isRep = false;
@@ -1450,9 +1517,17 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
   var h=getHash(b,mx,c2,eps);
   var entry=TT[h];
   if(entry&&entry.depth>=d){
-    if(entry.flag===0)return entry.val;
-    if(entry.flag===1&&entry.val.s<=al)return entry.val;
-    if(entry.flag===2&&entry.val.s>=bt)return entry.val;
+    var val = entry.val;
+    var s = val.s;
+    if (s > 90000) {
+      s -= searchPly;
+    } else if (s < -90000) {
+      s += searchPly;
+    }
+    var adjustedVal = {s: s, move: val.move};
+    if(entry.flag===0)return adjustedVal;
+    if(entry.flag===1&&s<=al)return adjustedVal;
+    if(entry.flag===2&&s>=bt)return adjustedVal;
   }
   if(d<=0)return{s:qsh(b,al,bt,mx,c2)};
   var col=mx?'w':'b',inCheck=iCk(b,col),mvs=aLeg(b,col,c2,eps);
@@ -1482,7 +1557,7 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
   }
   var best=mvs[0],sc={wk:c2.wk,wq:c2.wq,bk:c2.bk,bq:c2.bq};
   if(mx){
-    if(d>=3 && nmpOk!==false && !iCk(b,'w') && hasMat(b,'w')){
+    if(d>=3 && nmpOk!==false && !iCk(b,'w') && hasMat(b,'w') && getKingMobility(b,'w')>1){
       var nullS=mmx(b,d-3,bt-1,bt,false,c2,E,false);
       if(nullS.s>=bt)return {s:bt};
     }
@@ -1535,11 +1610,17 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
       var flag = 0;
       if (res.s <= origAlpha) flag = 1;
       else if (res.s >= origBeta) flag = 2;
-      TT[h]={depth:d,val:res,move:best,flag:flag};
+      var storeScore = res.s;
+      if (storeScore > 90000) {
+        storeScore += searchPly;
+      } else if (storeScore < -90000) {
+        storeScore -= searchPly;
+      }
+      TT[h]={depth:d,val:{s:storeScore,move:res.move},move:best,flag:flag};
     }
     return res;
   }else{
-    if(d>=3 && nmpOk!==false && !iCk(b,'b') && hasMat(b,'b')){
+    if(d>=3 && nmpOk!==false && !iCk(b,'b') && hasMat(b,'b') && getKingMobility(b,'b')>1){
       var nullS2=mmx(b,d-3,al,al+1,true,c2,E,false);
       if(nullS2.s<=al)return {s:al};
     }
@@ -1592,7 +1673,13 @@ function mmxCore(b,d,al,bt,mx,c2,eps,nmpOk){
       var flag = 0;
       if (res2.s <= origAlpha) flag = 1;
       else if (res2.s >= origBeta) flag = 2;
-      TT[h]={depth:d,val:res2,move:best,flag:flag};
+      var storeScore = res2.s;
+      if (storeScore > 90000) {
+        storeScore += searchPly;
+      } else if (storeScore < -90000) {
+        storeScore -= searchPly;
+      }
+      TT[h]={depth:d,val:{s:storeScore,move:res2.move},move:best,flag:flag};
     }
     return res2;
   }
@@ -2802,7 +2889,7 @@ function ev(b, c2){ // MAIN_THREAD_EV
   // King ring threat evaluation (squares around castled king)
   if (phase > 8) {
     var wKRingAttacks = 0;
-    if (wK[0] !== -1 && (wK[0] === 7 && (wK[1] === 6 || wK[1] === 2))) {
+    if (wK[0] !== -1 && (wK[0] === 7 && (wK[1] <= 2 || wK[1] >= 5))) {
       var kr = wK[0], kc = wK[1];
       for (var dr = -1; dr <= 1; dr++) {
         for (var dc = -1; dc <= 1; dc++) {
@@ -2821,7 +2908,7 @@ function ev(b, c2){ // MAIN_THREAD_EV
     }
     
     var bKRingAttacks = 0;
-    if (bK[0] !== -1 && (bK[0] === 0 && (bK[1] === 6 || bK[1] === 2))) {
+    if (bK[0] !== -1 && (bK[0] === 0 && (bK[1] <= 2 || bK[1] >= 5))) {
       var kr = bK[0], kc = bK[1];
       for (var dr = -1; dr <= 1; dr++) {
         for (var dc = -1; dc <= 1; dc++) {
@@ -2836,6 +2923,52 @@ function ev(b, c2){ // MAIN_THREAD_EV
       }
       if (bKRingAttacks > 0) {
         s += bKRingAttacks * 25;
+      }
+    }
+  }
+
+  // King mobility and trapped king evaluation
+  if (phase > 4) {
+    if (wK[0] !== -1) {
+      var wSafeSquares = 0;
+      var kr = wK[0], kc = wK[1];
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = kr + dr, nc = kc + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            var targetPiece = b[nr][nc];
+            if ((!targetPiece || co(targetPiece) === 'b') && !sAt(b, nr, nc, 'b')) {
+              wSafeSquares++;
+            }
+          }
+        }
+      }
+      if (wSafeSquares === 0 && (bR > 0 || bQ > 0)) {
+        s -= 250;
+      } else if (wSafeSquares === 1 && (bR > 0 || bQ > 0)) {
+        s -= 100;
+      }
+    }
+    if (bK[0] !== -1) {
+      var bSafeSquares = 0;
+      var kr = bK[0], kc = bK[1];
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = kr + dr, nc = kc + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            var targetPiece = b[nr][nc];
+            if ((!targetPiece || co(targetPiece) === 'w') && !sAt(b, nr, nc, 'w')) {
+              bSafeSquares++;
+            }
+          }
+        }
+      }
+      if (bSafeSquares === 0 && (wR > 0 || wQ > 0)) {
+        s += 250;
+      } else if (bSafeSquares === 1 && (wR > 0 || wQ > 0)) {
+        s += 100;
       }
     }
   }
@@ -3115,6 +3248,27 @@ return bt;
 }
 function hasMat(b,col){var tCol=col==='w';for(var r=0;r<8;r++)for(var c=0;c<8;c++){var p=b[r][c];if(p&&ty(p)!=='K'&&ty(p)!=='P'&&((p===p.toUpperCase())===tCol))return true}return false}
 
+function getKingMobility(b, col) {
+  var kp = fK(b, col);
+  if (!kp) return 8;
+  var kr = kp[0], kc = kp[1];
+  var opp = col === 'w' ? 'b' : 'w';
+  var safe = 0;
+  for (var dr = -1; dr <= 1; dr++) {
+    for (var dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      var nr = kr + dr, nc = kc + dc;
+      if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+        var p = b[nr][nc];
+        if ((!p || co(p) === opp) && !sAt(b, nr, nc, opp)) {
+          safe++;
+        }
+      }
+    }
+  }
+  return safe;
+}
+
 var MT_searchPath = [];
 var MT_searchPly = 0;
 function mmx(b,d,al,bt,mx,c2,eps,nmpOk){
@@ -3152,9 +3306,17 @@ function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
   var h=getHashMT(b,mx,c2,eps);
   var entry=MT_TT[h];
   if(entry&&entry.depth>=d){
-    if(entry.flag===0)return entry.val;
-    if(entry.flag===1&&entry.val.s<=al)return entry.val;
-    if(entry.flag===2&&entry.val.s>=bt)return entry.val;
+    var val = entry.val;
+    var s = val.s;
+    if (s > 90000) {
+      s -= MT_searchPly;
+    } else if (s < -90000) {
+      s += MT_searchPly;
+    }
+    var adjustedVal = {s: s, move: val.move};
+    if(entry.flag===0)return adjustedVal;
+    if(entry.flag===1&&s<=al)return adjustedVal;
+    if(entry.flag===2&&s>=bt)return adjustedVal;
   }
   if(d<=0)return{s:qsh(b,al,bt,mx,c2)};
   var col=mx?'w':'b',inCheck=iCk(b,col),mvs=aLeg(b,col,c2,eps);
@@ -3184,7 +3346,7 @@ function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
   }
   var best=mvs[0],sc={wk:c2.wk,wq:c2.wq,bk:c2.bk,bq:c2.bq};
   if(mx){
-    if(d>=3 && nmpOk!==false && !iCk(b,'w') && hasMat(b,'w')){
+    if(d>=3 && nmpOk!==false && !iCk(b,'w') && hasMat(b,'w') && getKingMobility(b,'w')>1){
       var nullS=mmx(b,d-3,bt-1,bt,false,c2,E,false);
       if(nullS.s>=bt)return {s:bt};
     }
@@ -3235,10 +3397,16 @@ function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
     var flag = 0;
     if(res.s <= origAlpha) flag = 1;
     else if(res.s >= origBeta) flag = 2;
-    MT_TT[h]={depth:d,val:res,move:best,flag:flag};
+    var storeScore = res.s;
+    if (storeScore > 90000) {
+      storeScore += MT_searchPly;
+    } else if (storeScore < -90000) {
+      storeScore -= MT_searchPly;
+    }
+    MT_TT[h]={depth:d,val:{s:storeScore,move:res.move},move:best,flag:flag};
     return res;
   }else{
-    if(d>=3 && nmpOk!==false && !iCk(b,'b') && hasMat(b,'b')){
+    if(d>=3 && nmpOk!==false && !iCk(b,'b') && hasMat(b,'b') && getKingMobility(b,'b')>1){
       var nullS2=mmx(b,d-3,al,al+1,true,c2,E,false);
       if(nullS2.s<=al)return {s:al};
     }
@@ -3289,7 +3457,13 @@ function mmxMTCore(b,d,al,bt,mx,c2,eps,nmpOk){
     var flag = 0;
     if(res2.s <= origAlpha) flag = 1;
     else if(res2.s >= origBeta) flag = 2;
-    MT_TT[h]={depth:d,val:res2,move:best,flag:flag};
+    var storeScore = res2.s;
+    if (storeScore > 90000) {
+      storeScore += MT_searchPly;
+    } else if (storeScore < -90000) {
+      storeScore -= MT_searchPly;
+    }
+    MT_TT[h]={depth:d,val:{s:storeScore,move:res2.move},move:best,flag:flag};
     return res2;
   }
 }
