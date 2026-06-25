@@ -27,7 +27,7 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 .gt-bar button{padding:2px 5px;border:1px solid #30363d;background:rgba(22,27,34,.7);color:#dfdfdf;border-radius:4px;cursor:pointer;font-size:.65rem;white-space:nowrap;line-height:1}
 .gt-bar button.on{background:rgba(88,166,255,.1);border-color:#58a6ff;color:#58a6ff}
 .gt-bar button:hover:not(.on){border-color:#58a6ff;background:#30363d}
-.bar{display:flex;justify-content:center;align-items:center;width:100%;padding:2px 4px;flex-wrap:nowrap;gap:3px;flex-shrink:0;height:28px;overflow:hidden}
+.bar{display:flex;justify-content:center;align-items:center;width:100%;padding:2px 4px;flex-wrap:wrap;gap:3px;flex-shrink:0;min-height:28px;}
 .bar button{padding:3px 7px;border:1px solid #30363d;background:rgba(22,27,34,.9);color:#e6edf3;border-radius:4px;cursor:pointer;font-size:clamp(.6rem,1.5vw,.72rem);white-space:nowrap;line-height:1.2}
 .bar button:hover{background:#30363d;border-color:#58a6ff}
 .pi{display:flex;align-items:center;gap:5px;width:100%;max-width:560px;padding:2px 8px;background:rgba(22,27,34,.6);border:1px solid #21262d;border-radius:5px;margin:1px 4px;font-size:clamp(.65rem,1.5vw,.78rem);flex-shrink:0;height:24px;overflow:hidden}
@@ -65,6 +65,88 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 .tg.ai{background:rgba(139,148,158,.15);color:#8b949e}
 .ml{width:100%;max-width:560px;max-height:18px;overflow:hidden;font-size:.6rem;color:#484f58;padding:1px 6px;direction:ltr;text-align:left;flex-shrink:0;white-space:nowrap;text-overflow:ellipsis}
 .ml:empty{display:none}
+
+/* Blunder warning animations and styles */
+@keyframes blunder-flash-border {
+  0%, 100% { border-color: #f85149; box-shadow: 0 0 12px rgba(248, 81, 73, 0.4); }
+  50% { border-color: #ff7b72; box-shadow: 0 0 25px rgba(248, 81, 73, 0.9); }
+}
+.brd-blunder {
+  animation: blunder-flash-border 1.2s ease-in-out infinite alternate !important;
+}
+@keyframes blunder-cell-pulse {
+  0%, 100% { background-color: rgba(248, 81, 73, 0.35); }
+  50% { background-color: rgba(248, 81, 73, 0.7); }
+}
+.sq.blunder-sq {
+  position: relative;
+}
+.sq.blunder-sq::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  animation: blunder-cell-pulse 1s ease-in-out infinite alternate;
+  z-index: 1;
+}
+@keyframes blunder-panel-pulse {
+  0%, 100% { border-color: rgba(248, 81, 73, 0.3); background: rgba(248, 81, 73, 0.05); }
+  50% { border-color: rgba(248, 81, 73, 0.8); background: rgba(248, 81, 73, 0.15); }
+}
+.ae-blunder {
+  animation: blunder-panel-pulse 1.5s ease-in-out infinite alternate;
+  border-left: 4px solid #f85149 !important;
+}
+.blunder-alert {
+  width: 100%;
+  max-width: 560px;
+  background: linear-gradient(90deg, rgba(248,81,73,0.2) 0%, rgba(248,81,73,0.05) 100%);
+  border: 1px solid rgba(248,81,73,0.4);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 4px auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #ff7b72;
+  animation: blunder-pulse 1.5s infinite alternate;
+  flex-shrink: 0;
+}
+@keyframes blunder-pulse {
+  0% {
+    box-shadow: 0 0 5px rgba(248,81,73,0.2);
+    border-color: rgba(248,81,73,0.4);
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(248,81,73,0.5);
+    border-color: rgba(248,81,73,0.8);
+  }
+}
+.dismiss-blunder-btn {
+  background: transparent;
+  border: none;
+  color: #ff7b72;
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  font-weight: bold;
+}
+.dismiss-blunder-btn:hover {
+  color: #fff;
+}
+
+@keyframes alt-move-pulse {
+  0%, 100% { border-color: rgba(88, 166, 255, 0.4); box-shadow: inset 0 0 8px rgba(88, 166, 255, 0.3); }
+  50% { border-color: rgba(88, 166, 255, 0.9); box-shadow: inset 0 0 15px rgba(88, 166, 255, 0.6); }
+}
+.sq.best-alt-sq {
+  border: 2px dashed #58a6ff !important;
+  box-sizing: border-box;
+  animation: alt-move-pulse 1.5s ease-in-out infinite alternate;
+  position: relative;
+}
 
 /* Review */
 #revS{overflow-y:auto;padding:4px}
@@ -137,6 +219,10 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 </div>
 <div class="pi" id="ti"><span>🤖</span><span id="tn">AI</span><span class="cp" id="tc"></span></div>
 <div id="sts"></div>
+<div id="blunderAlert" class="blunder-alert" style="display:none;">
+  <span style="display:flex; align-items:center; gap:6px;">⚠️ حرکت شما یک اشتباه بزرگ (Blunder) بود!</span>
+  <button onclick="dismissBlunderAlert()" class="dismiss-blunder-btn" title="بستن">&times;</button>
+</div>
 <div id="bwrap"><div id="brd"></div></div>
 <div class="pi" id="bi"><span>👤</span><span id="bn">شما</span><span class="cp" id="bc"></span></div>
 <div class="mwi">
@@ -145,9 +231,10 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 </div>
 <div class="mwe" id="manMvErr"></div>
 <div class="mem-container" id="memContainer" style="display:flex; gap:6px; width:100%; max-width:560px; padding:0 8px; margin:2px 4px; flex-shrink:0; height:24px; align-items:center; justify-content:space-between;">
-  <span style="font-size:0.65rem; color:#8b949e; font-family:'Segoe UI',Tahoma,sans-serif;">💾 کنترل حافظه:</span>
+  <span style="font-size:0.65rem; color:#8b949e; font-family:'Segoe UI',Tahoma,sans-serif;">💾 کنترل بازی و حافظه:</span>
   <div style="display:flex; gap:6px;">
-    <button id="btnClearTempMem" class="mem-btn" style="padding:2px 8px; border:1px solid #30363d; background:rgba(240,136,62,0.15); color:#f0883e; border-radius:4px; cursor:pointer; font-size:0.65rem; white-space:nowrap; font-family:inherit;">🧹 حافظه موقت (کش)</button>
+    <button id="btnPgnExportMain" class="mem-btn" style="padding:2px 8px; border:1px solid #30363d; background:rgba(88,166,255,0.15); color:#58a6ff; border-radius:4px; cursor:pointer; font-size:0.65rem; white-space:nowrap; font-family:inherit;">📋 خروجی PGN</button>
+    <button id="btnClearTempMem" class="mem-btn" style="padding:2px 8px; border:1px solid #30363d; background:rgba(240,136,62,0.15); color:#f0883e; border-radius:4px; cursor:pointer; font-size:0.65rem; white-space:nowrap; font-family:inherit;">🧹 کش</button>
     <button id="btnClearTotalMem" class="mem-btn" style="padding:2px 8px; border:1px solid #30363d; background:rgba(248,81,73,0.15); color:#f85149; border-radius:4px; cursor:pointer; font-size:0.65rem; white-space:nowrap; font-family:inherit;">☣️ حافظه کل</button>
   </div>
 </div>
@@ -161,6 +248,10 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 <div class="rm" id="rvm"></div>
 <div class="ri" id="rvi"></div>
 <div class="sb" id="rvs"></div>
+<div style="display:flex; gap:8px; margin:8px auto; width:min(70vw,320px); flex-shrink:0;">
+  <button id="btnExportAnalysis" onclick="openAnalysisExportModal()" style="flex:1; padding:8px; border:1px solid #30363d; background:rgba(88,166,255,0.15); color:#58a6ff; border-radius:8px; cursor:pointer; font-size:0.72rem; font-weight:bold; font-family:inherit;">📥 خروجی آنالیز (JSON)</button>
+  <button onclick="show('gameS')" style="flex:1; padding:8px; border:1px solid #30363d; background:#21262d; color:#c9d1d9; border-radius:8px; cursor:pointer; font-size:0.72rem; font-family:inherit;">🔙 بازگشت به بازی</button>
+</div>
 </div>
 <div id="learnS" class="scr">
 <div class="bar" id="lbar"></div>
@@ -168,6 +259,36 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0d1117;color:#e6edf3;d
 <div class="lc" id="lcon"></div>
 </div>
 <div id="pmod"><div class="pm"><p>مهره را انتخاب کنید:</p><div class="pc" id="pcs"></div></div></div>
+<div id="pgnMod" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:200; align-items:center; justify-content:center; padding:10px;">
+  <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; width:100%; max-width:480px; display:flex; flex-direction:column; padding:16px; gap:12px; box-shadow:0 4px 20px rgba(0,0,0,0.6);">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #21262d; padding-bottom:8px;">
+      <h3 style="font-size:0.95rem; color:#58a6ff; font-weight:600; margin:0;">📋 خروجی PGN بازی</h3>
+      <button id="closePgnBtn" style="background:transparent; border:none; color:#8b949e; cursor:pointer; font-size:1.2rem; line-height:1; padding:0 4px;">&times;</button>
+    </div>
+    <textarea id="pgnText" readonly style="width:100%; height:160px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; font-family:monospace; font-size:0.75rem; padding:8px; resize:none; outline:none; direction:ltr; text-align:left;"></textarea>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button id="copyPgnBtn" style="padding:6px 12px; border:1px solid #30363d; background:#21262d; color:#c9d1d9; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:500;">📋 کپی متن</button>
+      <button id="downloadPgnBtn" style="padding:6px 12px; border:1px solid #238636; background:#2ea44f; color:#fff; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:bold;">💾 دانلود فایل PGN</button>
+    </div>
+    <div id="pgnStatus" style="font-size:0.7rem; color:#58a6ff; text-align:center; height:14px;"></div>
+  </div>
+</div>
+
+<div id="analysisExportMod" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:200; align-items:center; justify-content:center; padding:10px;">
+  <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; width:100%; max-width:520px; display:flex; flex-direction:column; padding:16px; gap:12px; box-shadow:0 4px 20px rgba(0,0,0,0.6);">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #21262d; padding-bottom:8px;">
+      <h3 style="font-size:0.95rem; color:#58a6ff; font-weight:600; margin:0;">📥 خروجی آنالیز و طرز فکر هوش مصنوعی</h3>
+      <button id="closeAnalysisExportBtn" onclick="document.getElementById('analysisExportMod').style.display='none'" style="background:transparent; border:none; color:#8b949e; cursor:pointer; font-size:1.2rem; line-height:1; padding:0 4px;">&times;</button>
+    </div>
+    <p style="font-size:0.75rem; color:#8b949e; margin:0;">این خروجی حاوی اطلاعات دقیق تحلیل کل بازی، دقت حرکات شما و بهترین واریانت‌های پیشنهادی موتور شطرنج است که می‌توانید آن را کپی کرده و ذخیره نمایید.</p>
+    <textarea id="analysisExportText" readonly style="width:100%; height:180px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; font-family:monospace; font-size:0.75rem; padding:8px; resize:none; outline:none; direction:ltr; text-align:left;"></textarea>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button id="copyAnalysisBtn" onclick="copyAnalysisText()" style="padding:6px 12px; border:1px solid #30363d; background:#21262d; color:#c9d1d9; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:500;">📋 کپی متن آنالیز</button>
+      <button id="downloadAnalysisBtn" onclick="downloadAnalysisFile()" style="padding:6px 12px; border:1px solid #238636; background:#2ea44f; color:#fff; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:bold;">💾 دانلود فایل JSON</button>
+    </div>
+    <div id="analysisExportStatus" style="font-size:0.7rem; color:#58a6ff; text-align:center; height:14px;"></div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -306,7 +427,7 @@ var ON={
   'd2d4.g8f6.c2c4.e7e6.b1c3.f8b4': 'دفاع نیمزو-هندی',
   'd2d4.g8f6.c2c4.e7e6.g1f3.b7b6': 'دفاع هندی وزیر'
 };
-var bd,tn,sel,pms,ov,cas,epq,lmv,cW,cB,df=2,PC='w',fl=false,aOn=false,hs=[],GR=[],mn=0,oNm='',rvI=0,userTimeLimit='default';
+var bd,tn,sel,pms,ov,cas,epq,lmv,cW,cB,df=2,PC='w',fl=false,aOn=false,hs=[],GR=[],mn=0,oNm='',rvI=0,userTimeLimit='default',lastMoveWasBlunder=false,blunderMv=null;
 var boardSize=300;
 var sfx={move:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3'),capture:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3'),check:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-check.mp3'),end:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-end.mp3'),start:new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-start.mp3')};
 function playSound(t){if(sfx[t]){sfx[t].currentTime=0;sfx[t].play().catch(function(){})}}
@@ -1809,6 +1930,50 @@ self.onmessage=function(e){
         ponderMove: ponderMove
       }
     });
+  } else if (d.type === 'analyze_move') {
+    if (d.clearTT !== false || Object.keys(TT).length > 150000) {
+      TT = {};
+    }
+    killerMoves = {};
+    searchPly = 0;
+    for (var i = 0; i < 4096; i++) historyTable[i] = 0;
+    globalStartTime = Date.now();
+    globalTimeLimit = 15000;
+    globalAborted = false;
+    nodeCount = 0;
+    gameHashes = [];
+    searchPath = [];
+
+    var mx = d.mx;
+    var depth = d.d || 4;
+
+    var bst = mmx(d.bd, depth, -1e9, 1e9, mx, d.c2, d.eps);
+    var bS = bst.s;
+
+    var tb = cln(d.bd);
+    var tm = d.mv;
+    appM(tb, tm);
+
+    var nc = { wk: d.c2.wk, wq: d.c2.wq, bk: d.c2.bk, bq: d.c2.bq };
+    uCRc(nc, tm);
+
+    var aft = mmx(cln(tb), Math.max(1, depth - 1), -1e9, 1e9, !mx, nc, tm.epc || E);
+    var pS = aft.s;
+
+    var dd = Math.max(0, mx ? (bS - pS) : (pS - bS));
+    var ac = Math.max(0, Math.min(100, Math.round(100 - dd * 0.25)));
+
+    self.postMessage({
+      type: 'analysis_result',
+      id: d.id,
+      res: {
+        ac: ac,
+        bS: bS,
+        pS: pS,
+        bestMove: bst.move,
+        mv: tm
+      }
+    });
   }
 };
 `;
@@ -1847,6 +2012,257 @@ function terminateWorker(){
   ponderMoveApplied=null;
 }
 
+var analysisWorker = null;
+var isFullAnalysisInProgress = false;
+var fullAnalysisIndex = 1;
+var fullAnalysisCompleted = false;
+
+function getAnalysisWorker() {
+  if (!analysisWorker) {
+    if (!workerBlobUrl) {
+      var blob = new Blob([WORKER_CODE], {type: 'application/javascript'});
+      workerBlobUrl = URL.createObjectURL(blob);
+    }
+    analysisWorker = new Worker(workerBlobUrl);
+    
+    analysisWorker.onmessage = function(e) {
+      var d = e.data;
+      if (d.type === 'analysis_result') {
+        var id = d.id;
+        var res = d.res;
+        
+        if (id.indexOf('play_') === 0) {
+          var grIdx = parseInt(id.split('_')[1], 10);
+          if (GR[grIdx]) {
+            var ac = res.ac;
+            var mv = res.mv;
+            var bestMove = res.bestMove;
+            var bB = GR[grIdx-1].bd;
+            
+            var text = formatAnalysisText(bB, mv, ac, bestMove);
+            
+            GR[grIdx].an = text;
+            GR[grIdx].ac = ac;
+            GR[grIdx].bestMv = bestMove;
+            
+            var el = document.querySelector('.ae-pending-' + grIdx);
+            if (el) {
+              var tg = '';
+              if (ac >= 95) {
+                tg = '<span class="tg gr">عالی</span>';
+                el.className = 'ae';
+              } else if (ac >= 80) {
+                tg = '<span class="tg gd">خوب</span>';
+                el.className = 'ae';
+              } else if (ac >= 60) {
+                tg = '<span class="tg ok">متوسط</span>';
+                el.className = 'ae';
+              } else if (ac >= 40) {
+                tg = '<span class="tg bd">ضعیف</span>';
+                el.className = 'ae';
+              } else {
+                tg = '<span class="tg bl">اشتباه</span>';
+                el.className = 'ae ae-blunder';
+              }
+              el.innerHTML = tg + ' ' + text;
+            }
+            
+            if (ac < 40) {
+              if (window.showBlunderWarning) {
+                window.showBlunderWarning(mv);
+              }
+            } else {
+              if (grIdx === GR.length - 1 && window.dismissBlunderAlert) {
+                window.dismissBlunderAlert();
+              }
+            }
+          }
+        } else if (id.indexOf('full_') === 0) {
+          handleFullAnalysisStep(id, res);
+        }
+      }
+    };
+  }
+  return analysisWorker;
+}
+
+function formatAnalysisText(bB, mv, ac, bestMove) {
+  var pc = bB[mv.fr][mv.fc];
+  var pN = PF[ty(pc)] || '';
+  var ds = s2a(mv.tr, mv.tc);
+  var rs = [];
+  var txt = '';
+  
+  if (ac >= 95) {
+    txt = '✨عالی!';
+    rs.push('بهترین حرکت');
+  } else if (ac >= 80) {
+    txt = '👍خوب!';
+    rs.push('حرکت قوی');
+  } else if (ac >= 60) {
+    txt = '👌قابل قبول';
+    rs.push('بد نیست');
+  } else if (ac >= 40) {
+    txt = '⚠️ضعیف';
+    rs.push('حرکت ضعیف');
+  } else {
+    txt = '❌اشتباه!';
+    rs.push('اشتباه جدی');
+  }
+  
+  if (mv.cap) rs.push('گرفتن ' + (PF[ty(mv.cap)] || 'مهره'));
+  if (mv.cas) rs.push('قلعه');
+  
+  if (ac < 80 && bestMove) {
+    var bp = bB[bestMove.fr][bestMove.fc];
+    if (bp) {
+      rs.push('بهتر: ' + (PF[ty(bp)] || '') + '→' + s2a(bestMove.tr, bestMove.tc));
+    }
+  }
+  
+  txt += ' ' + pN + '→' + ds + ' (' + ac + '%) — ' + rs.join('، ');
+  return txt;
+}
+
+function getPersianMoveName(boardBefore, mv) {
+  if (!mv) return '';
+  var pc = boardBefore[mv.fr][mv.fc];
+  var pN = PF[ty(pc)] || '';
+  var ds = s2a(mv.tr, mv.tc);
+  return pN + ' به ' + ds;
+}
+
+function startFullAiAnalysis() {
+  if (GR.length < 2 || isFullAnalysisInProgress) return;
+  isFullAnalysisInProgress = true;
+  fullAnalysisIndex = 1;
+  fullAnalysisCompleted = false;
+  bSum();
+  analyzeFullStep();
+}
+
+function analyzeFullStep() {
+  if (fullAnalysisIndex >= GR.length) {
+    isFullAnalysisInProgress = false;
+    fullAnalysisCompleted = true;
+    bSum();
+    rvGo(rvI);
+    return;
+  }
+  
+  var rec = GR[fullAnalysisIndex];
+  var beforeBoard = GR[fullAnalysisIndex-1].bd;
+  var crBefore = GR[fullAnalysisIndex-1].cas;
+  var epBefore = GR[fullAnalysisIndex-1].ep;
+  
+  try {
+    var workerAn = getAnalysisWorker();
+    workerAn.postMessage({
+      type: 'analyze_move',
+      id: 'full_' + fullAnalysisIndex,
+      bd: beforeBoard,
+      c2: crBefore,
+      eps: epBefore,
+      mv: rec.mv,
+      mx: GR[fullAnalysisIndex-1].tn === 'w',
+      d: Math.max(4, df + 1)
+    });
+    bSum();
+  } catch(e) {
+    console.error("Full analysis step error: ", e);
+    isFullAnalysisInProgress = false;
+  }
+}
+
+function handleFullAnalysisStep(id, res) {
+  var idx = parseInt(id.split('_')[1], 10);
+  if (GR[idx]) {
+    var beforeBoard = GR[idx-1].bd;
+    var ac = res.ac;
+    var mv = res.mv;
+    var bestMove = res.bestMove;
+    
+    GR[idx].ac = ac;
+    GR[idx].bestMv = bestMove;
+    GR[idx].an = formatAnalysisText(beforeBoard, mv, ac, bestMove);
+    
+    bRvM();
+  }
+  fullAnalysisIndex++;
+  analyzeFullStep();
+}
+
+function generateAnalysisJSON() {
+  var gameData = {
+    date: new Date().toISOString(),
+    difficulty: df,
+    playerColor: PC,
+    openingName: oNm || 'Unknown',
+    moves: []
+  };
+  
+  for (var i = 1; i < GR.length; i++) {
+    var rec = GR[i];
+    var beforeBoard = GR[i-1].bd;
+    
+    var moveInfo = {
+      moveIndex: i,
+      notation: rec.nt,
+      playedBy: (rec.ip ? 'User' : 'AI'),
+      accuracy: rec.ac !== undefined ? rec.ac : -1,
+      evaluationText: rec.an || '',
+      playedMove: rec.mv ? {
+        fromSquare: s2a(rec.mv.fr, rec.mv.fc),
+        toSquare: s2a(rec.mv.tr, rec.mv.tc),
+        piece: rec.mv.pc,
+        capture: rec.mv.cap || null,
+        promotion: rec.mv.pp || null
+      } : null,
+      bestAlternative: rec.bestMv ? {
+        fromSquare: s2a(rec.bestMv.fr, rec.bestMv.fc),
+        toSquare: s2a(rec.bestMv.tr, rec.bestMv.tc),
+        namePersian: getPersianMoveName(beforeBoard, rec.bestMv)
+      } : null
+    };
+    gameData.moves.push(moveInfo);
+  }
+  
+  return JSON.stringify(gameData, null, 2);
+}
+
+function openAnalysisExportModal() {
+  var txt = generateAnalysisJSON();
+  document.getElementById('analysisExportText').value = txt;
+  document.getElementById('analysisExportMod').style.display = 'flex';
+  document.getElementById('analysisExportStatus').textContent = '';
+}
+
+function copyAnalysisText() {
+  var txt = document.getElementById('analysisExportText');
+  txt.select();
+  txt.setSelectionRange(0, 99999);
+  try {
+    navigator.clipboard.writeText(txt.value);
+    document.getElementById('analysisExportStatus').textContent = '📋 با موفقیت کپی شد!';
+  } catch (err) {
+    document.getElementById('analysisExportStatus').textContent = 'خطا در کپی. لطفاً دستی کپی کنید.';
+  }
+}
+
+function downloadAnalysisFile() {
+  var txt = document.getElementById('analysisExportText').value;
+  var blob = new Blob([txt], { type: 'application/json;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'chess_ai_analysis.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  document.getElementById('analysisExportStatus').textContent = '💾 فایل با موفقیت دانلود شد!';
+}
+
 function mkBd(){return[['r','n','b','q','k','b','n','r'],['p','p','p','p','p','p','p','p'],[E,E,E,E,E,E,E,E],[E,E,E,E,E,E,E,E],[E,E,E,E,E,E,E,E],[E,E,E,E,E,E,E,E],['P','P','P','P','P','P','P','P'],['R','N','B','Q','K','B','N','R']]}
 function cln(b){return[b[0].slice(),b[1].slice(),b[2].slice(),b[3].slice(),b[4].slice(),b[5].slice(),b[6].slice(),b[7].slice()]}
 function co(p){return p?(p===p.toUpperCase()?'w':'b'):E}
@@ -1857,22 +2273,237 @@ function m2k(m){return s2a(m.fr,m.fc)+s2a(m.tr,m.tc)}
 function show(id){if(id==='menuS'){terminateWorker();aOn=false}document.querySelectorAll('.scr').forEach(function(s){s.classList.remove('on')});document.getElementById(id).classList.add('on');if(id==='gameS')setTimeout(calcBoard,10)}
 
 function calcBoard(){
-var vh=window.innerHeight;
-var fixedH=28+24+24+20+24+18+4+8 + 24;// bar+timeRGame+pi+sts+pi+ml+gaps+border+mem
-var apEl=document.getElementById('ap');
-var apH=apEl.childElementCount>0?Math.min(apEl.scrollHeight,70):0;
-fixedH+=apH;
-var avail=vh-fixedH-8;
-var vw=window.innerWidth-8;
-boardSize=Math.min(avail,vw,560);
-boardSize=Math.max(boardSize,180);
-var brd=document.getElementById('brd');
-brd.style.width=boardSize+'px';
-brd.style.height=boardSize+'px';
-var fs=Math.floor(boardSize/8*0.7);
-brd.querySelectorAll('.sq').forEach(function(sq){sq.style.fontSize=fs+'px'});
-document.getElementById('ap').style.maxHeight=Math.max(40,Math.min(70,vh-boardSize-fixedH+apH))+'px';
+  var gameS = document.getElementById('gameS');
+  if (!gameS) return;
+  var vh = window.innerHeight;
+  var fixedH = 0;
+  
+  var children = gameS.children;
+  for (var i = 0; i < children.length; i++) {
+    var child = children[i];
+    if (child.id !== 'bwrap') {
+      var display = child.style.display || window.getComputedStyle(child).display;
+      if (display !== 'none') {
+        var h = child.offsetHeight || 0;
+        if (h === 0) {
+          if (child.id === 'blunderAlert') h = 38;
+          else if (child.id === 'manMvErr') h = 14;
+          else if (child.id === 'ap') h = 40;
+        }
+        fixedH += h;
+      }
+    }
+  }
+  
+  fixedH += 12; // Safety padding/margin for gaps and borders
+  
+  var avail = vh - fixedH;
+  var vw = window.innerWidth - 8;
+  boardSize = Math.min(avail, vw, 560);
+  boardSize = Math.max(boardSize, 180);
+  
+  var brd = document.getElementById('brd');
+  if (brd) {
+    brd.style.width = boardSize + 'px';
+    brd.style.height = boardSize + 'px';
+    var fs = Math.floor(boardSize / 8 * 0.7);
+    brd.querySelectorAll('.sq').forEach(function(sq){sq.style.fontSize = fs + 'px'});
+  }
+  
+  var apEl = document.getElementById('ap');
+  if (apEl) {
+    var apH = apEl.childElementCount > 0 ? Math.min(apEl.scrollHeight, 70) : 0;
+    apEl.style.maxHeight = Math.max(40, Math.min(70, vh - boardSize - (fixedH - (apEl.offsetHeight || 0)))) + 'px';
+  }
 }
+
+function getStandardPGNMove(rec) {
+  var mv = rec.mv;
+  if (!mv) return '';
+  if (mv.cas) return mv.tc > mv.fc ? 'O-O' : 'O-O-O';
+  
+  var p = mv.pc ? ty(mv.pc) : '';
+  var n = '';
+  if (p && p !== 'P') {
+    n += p;
+  } else if (mv.cap) {
+    n += String.fromCharCode(97 + mv.fc);
+  }
+  
+  if (mv.cap) {
+    n += 'x';
+  }
+  
+  n += s2a(mv.tr, mv.tc);
+  
+  if (mv.pp) {
+    n += '=' + ty(mv.pp);
+  }
+  
+  if (iCk(rec.bd, rec.tn)) {
+    var hasMoves = aLeg(rec.bd, rec.tn, rec.cas, rec.ep).length > 0;
+    if (!hasMoves) {
+      n += '#';
+    } else {
+      n += '+';
+    }
+  }
+  
+  return n;
+}
+
+function generatePGN() {
+  var d = new Date();
+  var year = d.getFullYear();
+  var month = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  var dateStr = year + '.' + month + '.' + day;
+  
+  var whitePlayer = (PC === 'w') ? 'User (کاربر)' : 'AI (هوش مصنوعی)';
+  var blackPlayer = (PC === 'b') ? 'User (کاربر)' : 'AI (هوش مصنوعی)';
+  
+  var result = '*';
+  if (ov) {
+    if (iCk(bd, tn)) {
+      result = (tn === 'w') ? '0-1' : '1-0';
+    } else {
+      result = '1/2-1/2';
+    }
+  }
+  
+  var pgn = '';
+  pgn += '[Event "Unbalance Chess Match"]\n';
+  pgn += '[Site "AI Studio Chess App"]\n';
+  pgn += '[Date "' + dateStr + '"]\n';
+  pgn += '[Round "1"]\n';
+  pgn += '[White "' + whitePlayer + '"]\n';
+  pgn += '[Black "' + blackPlayer + '"]\n';
+  pgn += '[Result "' + result + '"]\n\n';
+  
+  var movesStr = '';
+  for (var i = 1; i < GR.length; i++) {
+    var moveNum = Math.ceil(i / 2);
+    var moveText = getStandardPGNMove(GR[i]);
+    if (i % 2 === 1) {
+      if (movesStr) movesStr += ' ';
+      movesStr += moveNum + '. ' + moveText;
+    } else {
+      movesStr += ' ' + moveText;
+    }
+  }
+  if (movesStr) {
+    pgn += movesStr + ' ' + result;
+  } else {
+    pgn += result;
+  }
+  
+  return pgn;
+}
+
+function openPgnModal() {
+  var modal = document.getElementById('pgnMod');
+  var txt = document.getElementById('pgnText');
+  var status = document.getElementById('pgnStatus');
+  status.textContent = '';
+  txt.value = generatePGN();
+  modal.style.display = 'flex';
+}
+
+function initPgnListeners() {
+  var closeBtn = document.getElementById('closePgnBtn');
+  if (closeBtn) {
+    closeBtn.onclick = function() {
+      document.getElementById('pgnMod').style.display = 'none';
+    };
+  }
+  
+  var modal = document.getElementById('pgnMod');
+  if (modal) {
+    modal.onclick = function(e) {
+      if (e.target === this) {
+        this.style.display = 'none';
+      }
+    };
+  }
+  
+  var copyBtn = document.getElementById('copyPgnBtn');
+  if (copyBtn) {
+    copyBtn.onclick = function() {
+      var txt = document.getElementById('pgnText');
+      txt.select();
+      txt.setSelectionRange(0, 99999);
+      try {
+        navigator.clipboard.writeText(txt.value).then(function() {
+          var status = document.getElementById('pgnStatus');
+          status.style.color = '#3fb950';
+          status.textContent = '📋 متن PGN با موفقیت در حافظه کپی شد!';
+          setTimeout(function() { status.textContent = ''; }, 3000);
+        }).catch(function() {
+          document.execCommand('copy');
+          var status = document.getElementById('pgnStatus');
+          status.style.color = '#3fb950';
+          status.textContent = '📋 متن PGN با موفقیت در حافظه کپی شد!';
+          setTimeout(function() { status.textContent = ''; }, 3000);
+        });
+      } catch(err) {
+        var status = document.getElementById('pgnStatus');
+        status.style.color = '#f85149';
+        status.textContent = '❌ خطا در کپی متن!';
+      }
+    };
+  }
+  
+  var downloadBtn = document.getElementById('downloadPgnBtn');
+  if (downloadBtn) {
+    downloadBtn.onclick = function() {
+      var pgnContent = document.getElementById('pgnText').value;
+      var blob = new Blob([pgnContent], { type: 'text/plain;charset=utf-8' });
+      var a = document.createElement('a');
+      var d = new Date();
+      var filename = 'chess_game_' + d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + '.pgn';
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      var status = document.getElementById('pgnStatus');
+      status.style.color = '#58a6ff';
+      status.textContent = '💾 فایل PGN با موفقیت دانلود شد!';
+      setTimeout(function() { status.textContent = ''; }, 3000);
+    };
+  }
+  
+  var pgnExportMain = document.getElementById('btnPgnExportMain');
+  if (pgnExportMain) {
+    pgnExportMain.onclick = openPgnModal;
+  }
+}
+
+// Initialize listeners immediately
+initPgnListeners();
+
+window.dismissBlunderAlert = function() {
+  var alertEl = document.getElementById('blunderAlert');
+  if (alertEl) alertEl.style.display = 'none';
+  var boardEl = document.getElementById('brd');
+  if (boardEl) boardEl.classList.remove('brd-blunder');
+  lastMoveWasBlunder = false;
+  blunderMv = null;
+  calcBoard();
+  ren();
+};
+
+window.showBlunderWarning = function(mv) {
+  lastMoveWasBlunder = true;
+  blunderMv = mv;
+  var alertEl = document.getElementById('blunderAlert');
+  if (alertEl) alertEl.style.display = 'flex';
+  var boardEl = document.getElementById('brd');
+  if (boardEl) boardEl.classList.add('brd-blunder');
+  calcBoard();
+  ren();
+};
 
 (function(){
 var dr=document.getElementById('diffR');
@@ -1898,7 +2529,7 @@ document.getElementById('btnW').onclick=function(){startG('w')};
 document.getElementById('btnB').onclick=function(){startG('b')};
 document.getElementById('btnL').onclick=function(){show('learnS');initL()};
 var gb=document.getElementById('gbar');
-[['🏠',function(){show('menuS')}],['💡پیشنهاد',function(){getHint()}],['↩️برگشت',function(){undoM()}],['🔄جدید',function(){startG(PC)}],['🔄چرخش',function(){fl=!fl;ren();}],['📋بازبینی',function(){enterRev()}]].forEach(function(x){
+[['🏠',function(){show('menuS')}],['💡پیشنهاد',function(){getHint()}],['↩️برگشت',function(){undoM()}],['🔄جدید',function(){startG(PC)}],['🔄چرخش',function(){fl=!fl;ren();}],['📋بازبینی',function(){enterRev()}],['📋خروجی PGN',function(){openPgnModal()}]].forEach(function(x){
 var b=document.createElement('button');b.textContent=x[0];b.onclick=x[1];gb.appendChild(b);});
 
 document.getElementById('btnClearTempMem').onclick = function() {
@@ -1980,7 +2611,7 @@ if (btn && inp) {
 }
 
 var rb=document.getElementById('rbar');
-[['🏠',function(){show('menuS')}],['بازگشت',function(){show('gameS')}],['▶ادامه',function(){contHere()}]].forEach(function(x){
+[['🏠',function(){show('menuS')}],['بازگشت',function(){show('gameS')}],['▶ادامه',function(){contHere()}],['📋خروجی PGN',function(){openPgnModal()}]].forEach(function(x){
 var b=document.createElement('button');b.textContent=x[0];b.onclick=x[1];rb.appendChild(b);});
 var rn=document.getElementById('rvn');
 [['⏮',function(){rvGo(0)}],['◀',function(){rvGo(rvI-1)}],['▶',function(){rvGo(rvI+1)}],['⏭',function(){rvGo(GR.length-1)}]].forEach(function(x){
@@ -1992,6 +2623,14 @@ window.addEventListener('resize',function(){if(document.getElementById('gameS').
 
 function startG(c){
 terminateWorker();
+if (window.dismissBlunderAlert) {
+  var alertEl = document.getElementById('blunderAlert');
+  if (alertEl) alertEl.style.display = 'none';
+  var boardEl = document.getElementById('brd');
+  if (boardEl) boardEl.classList.remove('brd-blunder');
+  lastMoveWasBlunder = false;
+  blunderMv = null;
+}
 PC=c;fl=(c==='b');bd=mkBd();tn='w';sel=E;pms=[];ov=false;cas={wk:1,wq:1,bk:1,bq:1};epq=E;lmv=E;cW=[];cB=[];aOn=false;hs=[];mn=0;oNm='';
 GR=[{bd:cln(bd),tn:'w',cas:{wk:1,wq:1,bk:1,bq:1},ep:E,cW:[],cB:[],mv:E,nt:'',an:'',ac:-1,ip:false}];
 show('gameS');
@@ -2012,7 +2651,13 @@ var s=document.createElement('div');
 var cls='sq '+((r+c)%2===0?'l':'d');
 var p=bd[r][c];
 if(sel&&sel[0]===r&&sel[1]===c)cls+=' sl';
-if(lmv&&((lmv.fr===r&&lmv.fc===c)||(lmv.tr===r&&lmv.tc===c)))cls+=' lm';
+if(lmv&&((lmv.fr===r&&lmv.fc===c)||(lmv.tr===r&&lmv.tc===c))) {
+  if(lastMoveWasBlunder && blunderMv && ((blunderMv.fr===r&&blunderMv.fc===c)||(blunderMv.tr===r&&blunderMv.tc===c))) {
+    cls+=' blunder-sq';
+  } else {
+    cls+=' lm';
+  }
+}
 var isPM=false;for(var k=0;k<pms.length;k++){if(pms[k].tr===r&&pms[k].tc===c){isPM=true;break}}
 if(isPM)cls+=bd[r][c]?' rg':' dt';
 if(p&&ty(p)==='K'&&iCk(bd,co(p)))cls+=' ck';
@@ -2031,6 +2676,9 @@ setTimeout(calcBoard,5);
 
 function clk(r,c){
 if(ov||aOn||tn!==PC)return;
+if(lastMoveWasBlunder && window.dismissBlunderAlert) {
+  dismissBlunderAlert();
+}
 var mv=E;for(var i=0;i<pms.length;i++){if(pms[i].tr===r&&pms[i].tc===c){mv=pms[i];break}}
 if(mv){if(mv.pro){sPro(mv);return}doP(mv);return}
 var p=bd[r][c];
@@ -2148,9 +2796,28 @@ sH();appM(bd,mv);
 if(mv.cap){if(tn==='w')cW.push(mv.cap);else cB.push(mv.cap)}
 uCR(mv);epq=mv.epc||E;lmv=mv;
 var nt=mkN(mv);logMv(nt);
-var an=anaP(bB,crB,epB,mv);
-GR.push({bd:cln(bd),tn:tn==='w'?'b':'w',cas:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},ep:epq,cW:cW.slice(),cB:cB.slice(),mv:cpM(mv),nt:nt,an:an.t,ac:an.a,ip:true});
-addA(an.t,true,an.a);
+
+var grIdx = GR.length;
+GR.push({bd:cln(bd),tn:tn==='w'?'b':'w',cas:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},ep:epq,cW:cW.slice(),cB:cB.slice(),mv:cpM(mv),nt:nt,an:'در حال بررسی... ⏳',ac:-1,ip:true});
+addA('حرکت شما: ' + nt + ' (در حال آنالیز... ⏳)', true, -1, 'ae-pending-' + grIdx);
+
+try {
+  var workerAn = getAnalysisWorker();
+  var reqId = 'play_' + grIdx;
+  workerAn.postMessage({
+    type: 'analyze_move',
+    id: reqId,
+    bd: bB,
+    c2: crB,
+    eps: epB,
+    mv: cpM(mv),
+    mx: PC === 'w',
+    d: Math.max(4, df + 2)
+  });
+} catch(e) {
+  console.error("Analysis worker error: ", e);
+}
+
 tn=tn==='w'?'b':'w';sel=E;pms=[];ren();upSt();
 if(!ov&&tn!==PC)setTimeout(aiTn,150);
 }
@@ -3516,7 +4183,30 @@ function anaP(bB,crB,epB,mv){try{var mx=PC==='w',d=3;MT_TT={};MT_searchPly=0;MT_
 
 function explAI(bB,mv,aiC,isB){var rs=[],pc=bB[mv.fr][mv.fc],pN=PF[ty(pc)]||'',ds=s2a(mv.tr,mv.tc);if(isB)rs.push('کتابی'+(oNm?' ('+oNm+')':''));if(mv.cas){rs.push('قلعه');return'🤖 '+rs.join('، ')}if(mv.cap)rs.push('گرفتن '+PF[ty(mv.cap)]);if(mv.pp)rs.push('ارتقاء');var tb=cln(bB);var tm={fr:mv.fr,fc:mv.fc,tr:mv.tr,tc:mv.tc,cap:mv.cap,cas:mv.cas,epc:mv.epc,epp:mv.epp,pp:mv.pp};appM(tb,tm);if(iCk(tb,aiC==='w'?'b':'w'))rs.push('کیش!');var bk=aiC==='w'?7:0;if(mv.fr===bk&&(ty(pc)==='N'||ty(pc)==='B'))rs.push('توسعه '+pN);if((mv.tr===3||mv.tr===4)&&(mv.tc===3||mv.tc===4))rs.push('کنترل مرکز');if(!rs.length)rs.push('بهبود موقعیت');return'🤖 '+pN+'→'+ds+' — '+rs.join('، ')}
 
-function addA(text,isP,ac){var ap=document.getElementById('ap');var d=document.createElement('div');d.className='ae';var tg='';if(isP&&ac>=0){if(ac>=95)tg='<span class="tg gr">عالی</span>';else if(ac>=80)tg='<span class="tg gd">خوب</span>';else if(ac>=60)tg='<span class="tg ok">متوسط</span>';else if(ac>=40)tg='<span class="tg bd">ضعیف</span>';else tg='<span class="tg bl">اشتباه</span>'}else if(!isP)tg='<span class="tg ai">AI</span>';d.innerHTML=tg+' '+text;ap.appendChild(d);ap.scrollTop=ap.scrollHeight;setTimeout(calcBoard,10)}
+function addA(text,isP,ac,idOrClass){
+  var ap=document.getElementById('ap');
+  var d=document.createElement('div');
+  d.className='ae';
+  if(idOrClass) d.className += ' ' + idOrClass;
+  var tg='';
+  if(isP&&ac>=0){
+    if(ac>=95)tg='<span class="tg gr">عالی</span>';
+    else if(ac>=80)tg='<span class="tg gd">خوب</span>';
+    else if(ac>=60)tg='<span class="tg ok">متوسط</span>';
+    else if(ac>=40)tg='<span class="tg bd">ضعیف</span>';
+    else {tg='<span class="tg bl">اشتباه</span>';d.className='ae ae-blunder ' + (idOrClass || '');}
+  } else if(!isP && ac === -2) {
+    tg='<span class="tg bl" style="background:#f85149; color:#fff;">اشتباه</span>';
+    d.className='ae ae-blunder ' + (idOrClass || '');
+  } else if(!isP) {
+    tg='<span class="tg ai">AI</span>';
+  }
+  d.innerHTML=tg+' '+text;
+  ap.appendChild(d);
+  ap.scrollTop=ap.scrollHeight;
+  setTimeout(calcBoard,10);
+  return d;
+}
 
 function applyAiMove(best, aiC, isBook) {
 if(best){
@@ -3769,13 +4459,117 @@ function startPondering() {
 
 function getHint(){if(ov||tn!==PC||aOn)return;addA('<span class="pu">💡تحلیل...</span>',false,-1);setTimeout(function(){try{var mx=PC==='w',d=Math.min(df+1,5);if(aiWorkerSearching){abortWorkerSearch()}if(abortArray){abortArray[0]=0}var worker=getWorker();var curWorkerMvId=Date.now();worker.onmessage=function(e){if(e.data.type==='result'&&e.data.id===curWorkerMvId){var res=e.data.res;if(res.move){var m=res.move;var p=bd[m.fr][m.fc];var ap=document.getElementById('ap');if(ap.lastElementChild)ap.lastElementChild.innerHTML='💡 '+(PF[ty(p)]||'')+' '+s2a(m.fr,m.fc)+'→'+s2a(m.tr,m.tc);sel=[m.fr,m.fc];pms=[m];ren();var cells=document.getElementById('brd').children;for(var ci=0;ci<cells.length;ci++){var di=Math.floor(ci/8),dj=ci%8;var r2=fl?7-di:di,c2=fl?7-dj:dj;if((r2===m.fr&&c2===m.fc)||(r2===m.tr&&c2===m.tc))cells[ci].classList.add('hn')}setTimeout(function(){sel=E;pms=[];ren()},3000)}}};worker.postMessage({type:'minimax',id:curWorkerMvId,bd:cln(bd),d:d,al:-1e9,bt:1e9,mx:mx,c2:{wk:cas.wk,wq:cas.wq,bk:cas.bk,bq:cas.bq},eps:epq,timeLimit:userTimeLimit==='default'?2500:userTimeLimit,abortBuffer:abortBuffer,gameHashes:GR.map(function(g){return getHashMT(g.bd,g.tn==='w',g.cas,g.ep)})})}catch(e){}},50)}
 
-function undoM(){terminateWorker();if(aOn){aOn=false;if(hs.length>0){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}else{if(hs.length<2)return;for(var i=0;i<2&&hs.length>0;i++){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}while(GR.length>mn+1)GR.pop();ov=false;sel=E;pms=[];ren();upSt()}
+function undoM(){terminateWorker();if (window.dismissBlunderAlert) {var alertEl = document.getElementById('blunderAlert');if (alertEl) alertEl.style.display = 'none';var boardEl = document.getElementById('brd');if (boardEl) boardEl.classList.remove('brd-blunder');lastMoveWasBlunder = false;blunderMv = null;}if(aOn){aOn=false;if(hs.length>0){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}else{if(hs.length<2)return;for(var i=0;i<2&&hs.length>0;i++){var h=hs.pop();bd=h.bd;tn=h.tn;cas=h.cas;epq=h.ep;lmv=h.lmv;cW=h.cW;cB=h.cB;mn=h.mn}}while(GR.length>mn+1)GR.pop();ov=false;sel=E;pms=[];ren();upSt()}
 function endAn(){var pM=GR.filter(function(g){return g.ip&&g.ac>=0});if(!pM.length)return;var avg=Math.round(pM.reduce(function(s,g){return s+g.ac},0)/pM.length);addA('📊 دقت: '+avg+'% — 🔍بازبینی کنید',false,-1)}
 
 function enterRev(){if(GR.length<2)return;show('revS');rvI=GR.length-1;bRvM();rvGo(rvI);bSum()}
-function bRvM(){var el=document.getElementById('rvm');el.innerHTML='';for(var i=1;i<GR.length;i++){var s=document.createElement('span');var num=Math.ceil(i/2);s.textContent=(i%2===1?num+'.':'')+GR[i].nt;(function(ii){s.onclick=function(){rvGo(ii)}})(i);el.appendChild(s)}}
-function rvGo(i){i=Math.max(0,Math.min(GR.length-1,i));rvI=i;var g=GR[i],el=document.getElementById('rvb');el.innerHTML='';for(var di=0;di<8;di++)for(var dj=0;dj<8;dj++){var r=fl?7-di:di,c=fl?7-dj:dj;var s=document.createElement('div');s.className='sq '+((r+c)%2===0?'l':'d');s.style.fontSize='clamp(1rem,3.5vw,1.8rem)';var p=g.bd[r][c];if(p){var sp=document.createElement('span');sp.textContent=PM[p];sp.className=co(p)==='w'?'wpc':'bpc';s.appendChild(sp)}if(g.mv&&((g.mv.fr===r&&g.mv.fc===c)||(g.mv.tr===r&&g.mv.tc===c)))s.classList.add('lm');el.appendChild(s)}var ri=document.getElementById('rvi');if(i===0)ri.textContent='شروع بازی';else{var txt='حرکت'+i+': '+GR[i].nt+'\n';if(GR[i].an)txt+=GR[i].an;if(GR[i].ac>=0)txt+='\nدقت: '+GR[i].ac+'%';ri.textContent=txt}var spans=document.getElementById('rvm').children;for(var j=0;j<spans.length;j++)spans[j].classList.toggle('cu',j===i-1)}
-function bSum(){var el=document.getElementById('rvs');var pM=GR.filter(function(g){return g.ip&&g.ac>=0});if(!pM.length){el.innerHTML='<h3>خلاصه</h3><p>داده کافی نیست</p>';return}var avg=Math.round(pM.reduce(function(s,g){return s+g.ac},0)/pM.length);var best=pM[0],worst=pM[0];pM.forEach(function(g){if(g.ac>best.ac)best=g;if(g.ac<worst.ac)worst=g});var h='<h3>📊 خلاصه</h3><p>دقت: <b>'+avg+'%</b> | حرکات: '+pM.length+'</p>';if(oNm)h+='<p>📖'+oNm+'</p>';h+='<p>بهترین: '+best.nt+'('+best.ac+'%) | ضعیف‌ترین: '+worst.nt+'('+worst.ac+'%)</p>';el.innerHTML=h}
+function bRvM(){
+  var el=document.getElementById('rvm');
+  el.innerHTML='';
+  for(var i=1;i<GR.length;i++){
+    var s=document.createElement('span');
+    var num=Math.ceil(i/2);
+    s.textContent=(i%2===1?num+'.':'')+GR[i].nt;
+    if(GR[i].ac>=0){
+      if(GR[i].ac>=95) { s.style.borderColor='#3fb950'; s.style.color='#3fb950'; }
+      else if(GR[i].ac>=80) { s.style.borderColor='#58a6ff'; s.style.color='#58a6ff'; }
+      else if(GR[i].ac>=40) { s.style.borderColor='#d29922'; s.style.color='#d29922'; }
+      else { s.style.borderColor='#f85149'; s.style.color='#f85149'; s.style.fontWeight='bold'; }
+    }
+    (function(ii){s.onclick=function(){rvGo(ii)}})(i);
+    el.appendChild(s);
+  }
+}
+function rvGo(i){
+  i=Math.max(0,Math.min(GR.length-1,i));
+  rvI=i;
+  var g=GR[i],el=document.getElementById('rvb');
+  el.innerHTML='';
+  for(var di=0;di<8;di++)for(var dj=0;dj<8;dj++){
+    var r=fl?7-di:di,c=fl?7-dj:dj;
+    var s=document.createElement('div');
+    s.className='sq '+((r+c)%2===0?'l':'d');
+    s.style.fontSize='clamp(1rem,3.5vw,1.8rem)';
+    var p=g.bd[r][c];
+    if(p){
+      var sp=document.createElement('span');
+      sp.textContent=PM[p];
+      sp.className=co(p)==='w'?'wpc':'bpc';
+      s.appendChild(sp);
+    }
+    if(g.mv&&((g.mv.fr===r&&g.mv.fc===c)||(g.mv.tr===r&&g.mv.tc===c)))s.classList.add('lm');
+    if(g.ac>=0 && g.ac<80 && g.bestMv && ((g.bestMv.fr===r&&g.bestMv.fc===c)||(g.bestMv.tr===r&&g.bestMv.tc===c)))s.classList.add('best-alt-sq');
+    el.appendChild(s);
+  }
+  var ri=document.getElementById('rvi');
+  if(i===0)ri.textContent='شروع بازی';
+  else{
+    var txt='حرکت '+i+': '+GR[i].nt+'\n';
+    if(GR[i].an)txt+=GR[i].an;
+    if(GR[i].ac>=0){
+      txt+='\nدقت: '+GR[i].ac+'%';
+      if(GR[i].ac<80 && GR[i].bestMv){
+        var beforeBoard = GR[i-1].bd;
+        txt+='\n💡 بهترین حرکت پیشنهادی: ' + getPersianMoveName(beforeBoard, GR[i].bestMv);
+      }
+    }
+    ri.textContent=txt;
+  }
+  var spans=document.getElementById('rvm').children;
+  for(var j=0;j<spans.length;j++)spans[j].classList.toggle('cu',j===i-1);
+}
+function bSum(){
+  var el=document.getElementById('rvs');
+  if (isFullAnalysisInProgress) {
+    var pct = Math.round((fullAnalysisIndex / (GR.length - 1)) * 100);
+    el.innerHTML = '<h3>📊 در حال آنالیز با هوش مصنوعی...</h3>' +
+                   '<div style="width:100%; height:8px; background:#21262d; border-radius:4px; overflow:hidden; margin:8px 0;">' +
+                   '  <div style="width:' + pct + '%; height:100%; background:#58a6ff; transition:width 0.2s;"></div>' +
+                   '</div>' +
+                   '<p style="font-size:0.75rem; color:#8b949e; text-align:center;">حرکت ' + fullAnalysisIndex + ' از ' + (GR.length - 1) + ' (' + pct + '%)</p>';
+    return;
+  }
+  var pM=GR.filter(function(g){return g.ip&&g.ac>=0});
+  if(!pM.length){
+    var h = '<h3>📊 آنالیز هوشمند بازی</h3>' +
+            '<p style="font-size:0.75rem; color:#8b949e; margin-bottom:8px;">حرکات بازی هنوز آنالیز نشده‌اند. برای تحلیل دقیق کل حرکات و مشاهده اشتباهات خود دکمه زیر را بزنید:</p>' +
+            '<button id="btnFullAiAnalysis" onclick="startFullAiAnalysis()" style="width:100%; padding:8px; border:1px solid #58a6ff; background:rgba(88,166,255,0.1); color:#58a6ff; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:bold; font-family:inherit;">🔎 آنالیز کامل بازی با هوش مصنوعی</button>';
+    el.innerHTML = h;
+    return;
+  }
+  var avg=Math.round(pM.reduce(function(s,g){return s+g.ac},0)/pM.length);
+  var excellent = 0, good = 0, weak = 0, blunders = 0;
+  pM.forEach(function(g) {
+    if (g.ac >= 95) excellent++;
+    else if (g.ac >= 80) good++;
+    else if (g.ac >= 40) weak++;
+    else blunders++;
+  });
+  var h = '<h3>📊 گزارش آنالیز هوشمند</h3>' +
+          '<p style="font-size:0.8rem; margin:4px 0;">دقت کلی شما: <b style="color:#58a6ff; font-size:1rem;">' + avg + '%</b></p>' +
+          '<div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px; margin:8px 0; padding:6px; background:#161b22; border-radius:6px; border:1px solid #21262d;">' +
+          '  <span style="font-size:0.7rem; color:#3fb950;">✨ عالی: ' + excellent + '</span>' +
+          '  <span style="font-size:0.7rem; color:#58a6ff;">👍 خوب: ' + good + '</span>' +
+          '  <span style="font-size:0.7rem; color:#d29922;">⚠️ ضعیف: ' + weak + '</span>' +
+          '  <span style="font-size:0.7rem; color:#f85149; font-weight:bold;">❌ اشتباه: ' + blunders + '</span>' +
+          '</div>';
+  if(oNm) h += '<p style="font-size:0.75rem; color:#8b949e; margin-bottom:4px;">📖 شروع بازی: ' + oNm + '</p>';
+  var criticalBlunders = pM.filter(function(g){return g.ac < 40});
+  if (criticalBlunders.length > 0) {
+    h += '<h4 style="font-size:0.75rem; color:#ff7b72; margin-top:8px; margin-bottom:4px;">⚠️ اشتباهات کلیدی شما:</h4><ul style="padding-right:16px; margin:0; font-size:0.72rem; color:#c9d1d9;">';
+    criticalBlunders.slice(0, 3).forEach(function(g) {
+      var realIdx = GR.indexOf(g);
+      h += '<li style="margin-bottom:3px; cursor:pointer; text-decoration:underline; color:#58a6ff;" onclick="rvGo(' + realIdx + ')">' +
+           'حرکت ' + realIdx + ' (' + g.nt + '): دقت ' + g.ac + '%' +
+           '</li>';
+    });
+    h += '</ul>';
+  } else {
+    h += '<p style="font-size:0.75rem; color:#3fb950; font-weight:bold; margin-top:6px;">🎉 عالی بود! هیچ اشتباه بزرگی (Blunder) مرتکب نشدید!</p>';
+  }
+  h += '<button id="btnFullAiAnalysis" onclick="startFullAiAnalysis()" style="width:100%; margin-top:8px; padding:6px; border:1px solid #30363d; background:#21262d; color:#8b949e; border-radius:6px; cursor:pointer; font-size:0.7rem; font-family:inherit;">🔄 آنالیز مجدد</button>';
+  el.innerHTML = h;
+}
 function contHere(){terminateWorker();if(rvI<0||rvI>=GR.length)return;var g=GR[rvI];bd=cln(g.bd);tn=g.tn;cas={wk:g.cas.wk,wq:g.cas.wq,bk:g.cas.bk,bq:g.cas.bq};epq=g.ep;cW=g.cW.slice();cB=g.cB.slice();lmv=g.mv;ov=false;sel=E;pms=[];aOn=false;GR=GR.slice(0,rvI+1);hs=[];mn=rvI;document.getElementById('ml').textContent=GR.slice(1).map(function(x,i){var num=Math.ceil((i+1)/2);return((i+1)%2===1?num+'.':'')+x.nt}).join(' ');document.getElementById('ap').innerHTML='';show('gameS');ren();upSt();if(!ov&&tn!==PC)setTimeout(aiTn,200)}
 
 var LS=[
