@@ -594,9 +594,12 @@ function ev(b, c2){ // WK_EV_FUNC
 
       // Tactical vulnerability and blunder safety penalty
       if (t2 !== 'K') {
-        var isDefended = sAt(b, i, j, c);
         var by = c === 'w' ? 'b' : 'w';
         var isAttacked = sAt(b, i, j, by);
+        var isDefended = false;
+        if (isAttacked || t2 !== 'P') {
+          isDefended = sAt(b, i, j, c);
+        }
         
         // Pinned piece evaluation
         var isPinned = pinnedMap[i + "," + j] !== undefined;
@@ -2419,9 +2422,12 @@ function ev(b, c2){ // MAIN_THREAD_EV
 
       // Tactical vulnerability and blunder safety penalty (MAIN)
       if (t2 !== 'K') {
-        var isDefended = sAt(b, i, j, c);
         var by = c === 'w' ? 'b' : 'w';
         var isAttacked = sAt(b, i, j, by);
+        var isDefended = false;
+        if (isAttacked || t2 !== 'P') {
+          isDefended = sAt(b, i, j, c);
+        }
         
         // Pinned piece evaluation
         var isPinned = pinnedMap[i + "," + j] !== undefined;
